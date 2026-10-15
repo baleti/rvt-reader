@@ -102,4 +102,11 @@ def fam_instance(f, lvl):
         r0, r1 = (_g(r, 'm_elemId') for r in refs); o0, o1 = (_g(r, 'm_offset') or 0.0 for r in refs)
         if r0 is not None and r1 is not None and int(r0) in lvl and int(r1) in lvl:
             out['Length'] = (lvl[int(r1)] + o1) - (lvl[int(r0)] + o0)
+    # beams / braces / slanted columns: the member line (m_pCurveDriver.m_pCrv, a line) gives Length and the end elevations relative to the reference level
+    cd = f.get('m_pCurveDriver'); cd = cd.get('obj') if isinstance(cd, dict) else None
+    crv = ((cd or {}).get('m_pCrv') or {}); crv = crv.get('obj', crv) if isinstance(crv, dict) else None
+    if crv and isinstance(crv.get('m_dirVec'), list) and isinstance(crv.get('m_origin'), list) and isinstance(crv.get('m_endParams'), list) and len(crv['m_endParams']) == 2 and isinstance(cd.get('m_refLevelElev'), float) and abs(cd['m_refLevelElev']) < 1e20:
+        o, d_, (t0, t1) = crv['m_origin'], crv['m_dirVec'], crv['m_endParams']
+        out.setdefault('Length', t1 - t0)
+        out['Start Level Offset'] = o[2] + d_[2] * t0 - cd['m_refLevelElev']; out['End Level Offset'] = o[2] + d_[2] * t1 - cd['m_refLevelElev']
     return out

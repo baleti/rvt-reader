@@ -64,6 +64,24 @@ def symbol_params(path, symbol_id, _depth=0):
         for k, v in symbol_params(path, int(mid), _depth + 1).items(): out.setdefault(k, v)
     return out
 
+_CCN = None
+def _file_year(path):
+    try:
+        import olefile
+        b = olefile.OleFileIO(path).openstream('BasicFileInfo').read()
+        m = re.search(r'20\d\d', b.decode('utf-16le', 'replace'))
+        return m.group(0) if m else None
+    except Exception: return None
+
+def _conceptual_name(path, enum, subcat):
+    """ConceptualConstructionType names are built-in strings selected by (enum, mass sub-category): conceptual_construction_names.json (learned from the corpus, one table per Revit year: 2025+ spell the dash as a hyphen)"""
+    global _CCN
+    if _CCN is None:
+        try: _CCN = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'conceptual_construction_names.json')))
+        except Exception: _CCN = {}
+    y = _file_year(path); t = _CCN.get(y) or _CCN.get('2020') or {}
+    return t.get('%s|%d' % (enum, subcat & 0xFFFFFFFF))
+
 def params(path, geom=None):
     """geom=True (or env RVT_PARAMS_GEOM=1): also geometry-derived Volume/Area/Length/Width/Height of family instances from the decoded solids
     (rvt_geomparams; meshes every family instance: minutes on large files)"""
@@ -86,7 +104,7 @@ def params(path, geom=None):
             nm = PNAMES.get(pid) if pid != 'NAME' else 'Name'
             if nm is None: continue
             for cd in cands:
-                if 'm_pParamValueSet' in cd.get('path', ''):                # positional slots of the stored parameter sets shift per element: use a slot only when it holds this parameter (same id or same name)
+                if 'm_pParamValueSet' in cd.get('path', '') or 'm_pParams.obj.m_params[' in cd.get('path', ''):                # positional slots of the stored parameter sets shift per element: use a slot only when it holds this parameter (same id or same name)
                     if pid == 'NAME' or not cd['path'].endswith('.m_value'): continue
                     sp_ = M.resolve(src, eid, cd.get('via', ''), cd['path'][:-len('.m_value')] + '.m_paramId')
                     if sp_ is None: continue
@@ -112,6 +130,14 @@ def params(path, geom=None):
             mt = F.S_(f, 'm_pMaterial') or {}
             for k_, nm_ in (('m_transparency', 'Transparency'), ('m_smoothness', 'Smoothness'), ('m_shininess', 'Shininess')):
                 if isinstance(mt.get(k_), (int, float)) and not isinstance(mt.get(k_), bool): d[nm_] = int(round(mt[k_] * 100)) if isinstance(mt[k_], float) else mt[k_]          # floats are stored 0..1, Revit shows percent
+        elif c == 'Rebar':                                             # m_oInstance: nominal bar length, bar positions, layout (measured: Bar Length / Layout Rule exact, Quantity = positions minus excluded first / last bar)
+            oi_ = f.get('m_oInstance'); oi_ = oi_.get('obj', oi_) if isinstance(oi_, dict) else None
+            if oi_ and isinstance(oi_.get('m_barLength'), float) and isinstance(oi_.get('m_numberOfBarPositions'), int):
+                np_ = oi_['m_numberOfBarPositions']; q_ = np_ - (0 if oi_.get('m_includeFirstBar', 1) else 1) - (0 if oi_.get('m_includeLastBar', 1) else 1)
+                _setp(d, 'Bar Length', 'Double', oi_['m_barLength']); _setp(d, 'Quantity', 'Integer', q_)
+                if isinstance(oi_.get('m_layoutRule'), int): _setp(d, 'Layout Rule', 'Integer', oi_['m_layoutRule'])
+                _setp(d, 'Spacing', 'Double', oi_['m_maxSpacing'] if oi_.get('m_layoutRule') in (2, 3) and isinstance(oi_.get('m_maxSpacing'), float) else 0.0)
+                _setp(d, 'Total Bar Length', 'Double', q_ * oi_['m_barLength'])
         elif c == 'FamilyInstance':
             d.update(Gm.fam_instance(f, lv))
             if sym is not None and 'm_isHostPanelSym' in sym:          # curtain panel: its (derived) symbol stores the cell size; wall-type panels report Volume 0
@@ -161,11 +187,35 @@ def params(path, geom=None):
                 d['%s|%s|%s' % (nm, stg_, bip)] = v                    # parameter-id key: same-name parameters keep separate values
                 if nm not in d: d[nm] = v
                 if ovr: d['Category|ElementId'] = v
+        if c == 'ConceptualConstructionType':                            # energy-analysis construction types: the type name is the symbol name
+            sc_ = f.get('m_massSurfaceSubCategoryId')
+            nm_ = _conceptual_name(path, f.get('m_conceptualConstructionTypeEnumAsInt'), _sid(sc_)) if sc_ is not None else None
+            if isinstance(nm_, str) and nm_: _setp(d, 'Type Name', 'String', nm_)
+        if c == 'FamilySymbol':                                          # a symbol's own family parameters (profile dims, door/window widths) by caption: exact, beat the positional learned guesses
+            for k_, (v0_, vi_, vs_, ve_) in F.named_values({}, cap, f).items():
+                if isinstance(v0_, float) and not vs_ and (ve_ is None or int(ve_) in (0xFFFFFFFF, 0xFFFFFFFFFFFFFFFF)): _setp(d, k_, 'Double', v0_)
+        if c == 'FamilySymbol':                                          # built-in parameters stored in the symbol's own m_pParams (paramId = -bip): thermal / optical values, analytic construction
+            for p_ in (F.S_(f, 'm_pParams', 'm_params') or []):
+                try: bid_ = _sid(p_['m_paramId'])
+                except Exception: continue
+                nm_ = PNAMES.get(str(bid_)) if bid_ < -1000 else None
+                if nm_ is None or not isinstance(p_.get('m_value'), float): continue
+                if p_.get('m_str'): _setp(d, nm_, 'String', p_['m_str'])
+                else: _setp(d, nm_, 'Double', p_['m_value'])
+                if nm_ in d and not isinstance(d[nm_], str) and p_.get('m_str'): del d[nm_]
+            if d.get('Category|ElementId') in (-2000023, -2000014):          # door / window types: Rough Width / Height absent = 0 (765 of 901 corpus values)
+                for nm_ in ('Rough Width', 'Rough Height'):
+                    if not any(k_.split('|')[0] == nm_ and '|Double' in k_ for k_ in d) and not isinstance(d.get(nm_), float): _setp(d, nm_, 'Double', 0.0)
         out[eid] = {'class': c, 'params': d}
     if geom:
         import rvt_elemmesh as EM, rvt_geomparams as GP
         doc = EM.Doc(path)
         for eid, o in out.items():
+            if o['class'] == 'RoomElem' and eid in doc.res:
+                try:
+                    for k_, v_ in GP.room_params(doc, eid).items(): o['params'][k_] = v_
+                except Exception: pass
+                continue
             if o['class'] not in ('FamilyInstance', 'SWall') and o['class'] not in GP.HOSTS or eid not in doc.res: continue
             cat = o['params'].get('Category|ElementId', -1)
             try: gp = GP.geom_params(doc, eid, recs[eid]['fields'], cat, o['class'])
@@ -182,6 +232,7 @@ def params(path, geom=None):
             if am is not None and int(am) in out and out[int(am)]['class'].startswith('AnalyticalModel'): out[int(am)]['params'].setdefault('Length', o['params']['Length'])
     if not os.environ.get('RVT_NOHOST'): _host_params(out, recs)
     if not os.environ.get('RVT_NOVIEWSHEET'): _view_sheet_params(out, recs)
+    _thermal_params(out, recs); _material_type(out, recs)
     _circuit_params(out, recs); _wire_params(out, recs); _fi_circuit_params(out, recs); _fi_system_params(out, recs); _hub_params(out, recs)
     # round ducts (type Family Name 'Round Duct'): Area = pi d L and a Diameter, not the rectangular 2 (w + h) L
     for o_ in out.values():
@@ -189,6 +240,11 @@ def params(path, geom=None):
         p_ = o_['params']; t_ = p_.get('Type Id'); fn_ = (out.get(t_) or {}).get('params', {}).get('Family Name') if isinstance(t_, int) else None
         if isinstance(fn_, str) and 'Round' in fn_ and isinstance(p_.get('Width'), float) and isinstance(p_.get('Length'), float):
             p_['Diameter'] = p_['Width']; p_['Area'] = math.pi * p_['Width'] * p_['Length']
+    for o_ in out.values():                                          # rebar: volume = total bar length x bar cross-section (Bar Diameter follows from the bar type by the learned rules)
+        if o_['class'] != 'Rebar': continue
+        p_ = o_['params']; t_ = p_.get('Total Bar Length|Double'); bd_ = next((v_ for k_, v_ in p_.items() if k_.split('|')[0] == 'Bar Diameter' and isinstance(v_, float)), None)
+        if isinstance(t_, float) and bd_ is not None:
+            for nm_ in ('Reinforcement Volume', 'Estimated Reinforcement Volume'): _setp(p_, nm_, 'Double', t_ * math.pi * (bd_ / 2) ** 2)
     for o_ in out.values():                                          # Family.Host (hosting behaviour): 0 for 91% of families (63 of 69 in rst_basic / Snowdon Structural); the hosted ones are not identified yet
         if o_['class'] == 'Family' and not any(k.split('|')[0] == 'Host' and '|Integer' in k for k in o_['params']): o_['params']['Host|Integer'] = 0
     for o_ in out.values():                                          # MEP fittings: Maximum / Minimum Size = largest / smallest round connector diameter named in the Size string
@@ -204,6 +260,40 @@ def params(path, geom=None):
         if o_['class'] != 'RbsPipeCurve': continue
         p_ = o_['params']; od_, id_ = p_.get('Outside Diameter'), p_.get('Inside Diameter')
         if isinstance(od_, float) and isinstance(id_, float): p_['Wall Thickness'] = (od_ - id_) / 2
+    # pipes / ducts / conduits: the cell's m_systemId names the MEP system element: System Name = the system's name, System Classification from its system type
+    for e_, o_ in out.items():
+        if not o_['class'].startswith('Rbs') or not o_['class'].endswith('Curve'): continue
+        sid_ = None
+        for c_ in ((recs[e_]['fields'].get('m_cellList') or {}).get('obj') or {}).get('m_cells') or []:
+            v_ = (c_.get('obj') or {}).get('m_systemId') if isinstance(c_, dict) else None
+            if v_ is not None and _sid(v_) in out and out[_sid(v_)]['class'].startswith('Rbs'): sid_ = _sid(v_); break
+        if sid_ is None: continue
+        sp_ = out[sid_]['params']; p_ = o_['params']
+        if isinstance(sp_.get('System Name'), str) and not any(k_.split('|')[0] == 'System Name' for k_ in p_): _setp(p_, 'System Name', 'String', sp_['System Name'])
+        t_ = sp_.get('Type Id')
+        if isinstance(t_, int) and t_ in out:
+            sc_ = out[t_]['params'].get('System Classification')
+            if isinstance(sc_, str) and not any(k_.split('|')[0] == 'System Classification' for k_ in p_): _setp(p_, 'System Classification', 'String', sc_)
+    # MEP system sections: a system (RbsHvacSystem / RbsPipingSystem) lists its members per section (m_rgSections[].m_rgSection[].m_id); the member's Section is the section it belongs to
+    # (an element shared by several sections: the section where it is the second end, else the first end; measured 1020 of 1036 on rme_basic) and its System Name the system's m_strName
+    sec_ = collections.defaultdict(list)
+    for e_, r_ in recs.items():
+        if r_['class'] not in ('RbsHvacSystem', 'RbsPipingSystem') or e_ not in out: continue
+        nm_ = r_['fields'].get('m_strName')
+        for s_ in r_['fields'].get('m_rgSections') or []:
+            o_ = (s_ or {}).get('obj') if isinstance(s_, dict) else None
+            if not isinstance(o_, dict): continue
+            ce_ = [_sid(c_['m_id']) for c_ in (o_.get('m_connEnds') or [])]
+            for m_ in o_.get('m_rgSection') or []:
+                sec_[_sid(m_['m_id'])].append((o_.get('m_nSection'), ce_, nm_ if isinstance(nm_, str) and nm_ else out[e_]['params'].get('System Name')))
+    for m_, L_ in sec_.items():
+        if m_ not in out: continue
+        c1 = [l[0] for l in L_ if len(l[1]) > 1 and l[1][1] == m_]; c0 = [l[0] for l in L_ if l[1] and l[1][0] == m_]
+        sel_ = max(c1) if c1 else (min(c0) if c0 else min(l[0] for l in L_))
+        p_ = out[m_]['params']
+        if isinstance(sel_, int): _setp(p_, 'Section', 'Integer', sel_)
+        nm_ = next((l[2] for l in L_ if l[0] == sel_ and l[2]), None)
+        if isinstance(nm_, str) and not any(k_.split('|')[0] == 'System Name' for k_ in p_): _setp(p_, 'System Name', 'String', nm_)
     # centre-line sub-elements of pipes/ducts (SegmentCenterLine, m_OwnerId) carry their run's end elevations and Area
     for e_, o_ in out.items():
         if not o_['class'].endswith('CenterLine') or o_['class'] == 'CurveElem': continue
@@ -215,6 +305,12 @@ def params(path, geom=None):
                 if k_.split('|')[0] in INH: o_['params'][k_] = v_
             for k_, v_ in out[ow]['params'].items():
                 if (' End ' in k_ and 'Elevation' in k_) or k_ in ('Area', 'Wall Thickness'): o_['params'].setdefault(k_, v_)
+    # OmniClass Title follows from the OmniClass Number (standard table; omniclass_titles.json holds the 73 numbers seen in the corpus, one title each)
+    try: _OT = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'omniclass_titles.json')))
+    except Exception: _OT = {}
+    for o_ in out.values():
+        p_ = o_['params']; n_ = p_.get('OmniClass Number')
+        if isinstance(n_, str) and n_ in _OT and not p_.get('OmniClass Title'): _setp(p_, 'OmniClass Title', 'String', _OT[n_])
     # Type IfcGUID: an instance carries its type's IfcGUID, a type element its own (both = ifcguid.from_unique(UniqueId) unless an IFC GUID is stored)
     for o_ in out.values():
         p_ = o_['params']
@@ -242,6 +338,56 @@ def _setp(d, nm, stg, v):
     """derived value for parameter name+storage: replaces learned per-parameter-id guesses of the same name and storage"""
     d[nm + '|' + stg] = v
     for k in [k for k in d if k.startswith(nm + '|' + stg + '|')]: del d[k]
+
+_THERMAL_ASSET = 'ec0048162207264ba23504ffc53660d5'       # m_sharedAssetIdMap key of a material's thermal asset (PropertySetElement)
+
+def _thermal_params(out, recs):
+    """layered types (m_pCompoundStructure): Thermal Resistance (R) = sum width / conductivity, U = 1/R, Thermal Mass = sum width * density * specific heat of each
+    layer material's thermal asset (measured exact on wall types, 2023 Construction template: 9.486 / 144361 vs Revit 9.4859 / 144359.5); Roughness/Absorptance from the type cell"""
+    for eid, r in recs.items():
+        f = r['fields']
+        if eid in out:
+            cl_ = ((f.get('m_cellList') or {}).get('obj') or {}).get('m_cells') or []
+            for c_ in cl_:
+                c_ = c_.get('obj', c_) if isinstance(c_, dict) else {}
+                if isinstance(c_.get('m_absorptance'), float): _setp(out[eid]['params'], 'Absorptance', 'Double', c_['m_absorptance'])
+                if isinstance(c_.get('m_roughness'), int): _setp(out[eid]['params'], 'Roughness', 'Integer', c_['m_roughness'])
+        cs = f.get('m_pCompoundStructure')
+        if not isinstance(cs, dict):
+            if eid in out and out[eid]['class'] == 'CompoundCeilingType':          # basic (single-layer 'Generic') ceiling: no structure, no thermal data in Revit either
+                for nm_ in ('Thermal Resistance (R)', 'Thermal Mass', 'Heat Transfer Coefficient (U)'): _setp(out[eid]['params'], nm_, 'Double', 0.0)
+            continue
+        cs = cs.get('obj', cs); L = cs.get('m_layers') if isinstance(cs, dict) else None
+        if not isinstance(L, list) or eid not in out: continue
+        d = out[eid]['params']; R = 0.0; M_ = 0.0; tot = 0.0; ok = True
+        for l in L:
+            w = l.get('m_layerWidth')
+            if not isinstance(w, float): ok = False; break
+            tot += w
+            if w <= 0: continue
+            m = recs.get(_sid(l.get('m_materialId'))); mt = (m or {}).get('fields', {}).get('m_pMaterial') if m else None
+            mt = mt.get('obj', mt) if isinstance(mt, dict) else None
+            ps = None
+            for s_ in ((mt or {}).get('m_assetMap') or {}).get('m_sharedAssetIdMap') or []:
+                if (((s_.get('first') or {}).get('m_value') or {}).get('m_guid')) == _THERMAL_ASSET: ps = out.get(_sid(s_.get('second')), {}).get('params')
+            k_ = ps.get('Thermal Conductivity') if ps else None; dn = ps.get('Density') if ps else None; sh = ps.get('Specific Heat') if ps else None
+            if not all(isinstance(v, float) for v in (k_, dn, sh)) or k_ <= 0: continue            # layer material without thermal asset (e.g. 'Default'): contributes nothing; a type with none reports 0 / 0 / 0
+            R += w / k_; M_ += w * dn * sh
+        if not ok: continue
+        _setp(d, 'Thermal Resistance (R)', 'Double', R); _setp(d, 'Thermal Mass', 'Double', M_)
+        _setp(d, 'Heat Transfer Coefficient (U)', 'Double', 1.0 / R if R > 0 else 0.0)
+        if out[eid]['class'] == 'BasicWallType': _setp(d, 'Width', 'Double', tot)
+
+_MATTYPE = {3: 1, 4: 2, 5: 3, 1: 4, 7: 4, 8: 4, 2: 6}      # PropertySetElement Class of the material's structural asset slot (guid 2df6...) -> Material Type (measured 29/29 materials, 2023 Construction template)
+
+def _material_type(out, recs):
+    for eid, r in recs.items():
+        if r['class'] != 'MaterialElem' or eid not in out: continue
+        mt = r['fields'].get('m_pMaterial'); mt = mt.get('obj', mt) if isinstance(mt, dict) else None
+        for s_ in ((mt or {}).get('m_assetMap') or {}).get('m_sharedAssetIdMap') or []:
+            if (((s_.get('first') or {}).get('m_value') or {}).get('m_guid')) == '2df6c9ede4489e4aabb922c8664c012c':
+                c_ = out.get(_sid(s_.get('second')), {}).get('params', {}).get('Class')
+                if isinstance(c_, int) and c_ in _MATTYPE: _setp(out[eid]['params'], 'Material Type', 'Integer', _MATTYPE[c_])
 
 def _view_sheet_params(out, recs):
     """views placed on sheets: Viewport Detail Number (m_detailNumber), Sheet Number / Sheet Name (sheet = the viewport's owner view), View Name, View Scale
