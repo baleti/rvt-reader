@@ -551,3 +551,98 @@ Exact reproduction of Revit's parameter values over all 20 TEST files (2,986,654
 New derivations (exact on every checked file): FamilyInstance Host (String: 'Level : <name>', '<Family Name> : <Type Name>' of the host or of the face the sketch plane references, '<not associated>', 'Surface'/'Subregion', 'Pad : <type>', 'Boundary Conditions') and Host Id (host for wall/roof/ceiling/joist/truss hosts, else -1); Work Plane (sketch plane datum level/grid/reference plane, face element, the beam system's plane for its beams, else '<not associated>'); dimension Count = number of witness references; Type IfcGUID (type's IfcGUID); Category from learned per-class rules over the header category (centre lines, views, styles, materials).
 CAVEAT (honest generalisation): train and test contain other-year copies of the same sample models, so a learned table keyed by element ids (e.g. a room's placement ref -> its name) can look right on the test split without generalising to a new model. Identity rules (value = source id) generalise; id-keyed name tables do not. A model-held-out split (train on some models, test on others) is the stricter measure: TODO.
 Still not reproduced (test split, % of values): a_lookup ~2-6% (electrical wire Type/Hot Conductors/Wire Size, Connection Status, view Family/Type strings, sheet numbers / detail numbers / view scale on viewports), b_geom ~5-7% (Volume/Area/Length/MEP elevations: geometry pass), c_mep ~0.1-4.7% (system names, flows, pressure drops: Revit's MEP engine), d_other 1-6%.
+
+## FINAL per-class / per-year geometry table, refreshed 2026-10-15 (c5-geometry; replaces the 2026-10-14 table; fidfull9 final code 2026-10-15, 60 of 61 gt4 files)
+fid_table.py over the newest row per file (fidfull9 = final code of 2026-10-15 where present). SiteSurface is classed as a flat sheet (topography surface: mesh area equals Revit Surface Area exactly, 2020 Commercial 16201.727).
+```
+class                      n   ACCURATE   true-off   box-only   (median IoU, median |vol err| where Revit gives Volume)
+FamilyInstance            14435     99.5%      0.3%      0.1%   iou 0.998  vol 0.00%
+CurveElem                 13743     99.9%      0.0%      0.1%   iou 1.000  vol nan%
+RbsDuctCurve               4943    100.0%      0.0%      0.0%   iou 1.000  vol nan%
+RbsPipeCurve               4400    100.0%      0.0%      0.0%   iou 1.000  vol nan%
+SWall                      2592     99.3%      0.1%      0.6%   iou 0.977  vol 0.00%
+RoomElem                   1605     99.4%      0.6%      0.0%   iou 1.000  vol 0.00%
+RbsConduitCurve            1356    100.0%      0.0%      0.0%   iou 1.000  vol nan%
+RbsFlexDuctCurve            997    100.0%      0.0%      0.0%   iou 1.000  vol nan%
+Ceiling                     693    100.0%      0.0%      0.0%   iou 1.000  vol 0.00%
+WallSweep                   452    100.0%      0.0%      0.0%   iou 1.000  vol nan%
+Floor                       442    100.0%      0.0%      0.0%   iou 1.000  vol 0.00%
+FilledRegion                422    100.0%      0.0%      0.0%   iou 0.000  vol nan%
+BaseRailing                 259    100.0%      0.0%      0.0%   iou 0.937  vol nan%
+DPart                       184     99.5%      0.0%      0.5%   iou 1.000  vol 0.00%
+Stairs                       94    100.0%      0.0%      0.0%   iou 1.000  vol nan%
+CableTray                    68    100.0%      0.0%      0.0%   iou 1.000  vol nan%
+AnalyticalModelWall          55    100.0%      0.0%      0.0%   iou 0.000  vol nan%
+ProfileRoof                  55    100.0%      0.0%      0.0%   iou 1.000  vol 0.00%
+ContFooting                  52    100.0%      0.0%      0.0%   iou 1.000  vol 0.00%
+Toposolid                    42     97.6%      2.4%      0.0%   iou 1.000  vol 0.00%
+SweepHost                    41    100.0%      0.0%      0.0%   iou 0.039  vol 0.00%
+ShaftOpening                 37    100.0%      0.0%      0.0%   iou 1.000  vol nan%
+AnalyticalModelSlab          24    100.0%      0.0%      0.0%   iou 0.000  vol nan%
+ExtrusionElem                33    100.0%      0.0%      0.0%   iou 1.000  vol nan%
+MassLevelData                32    100.0%      0.0%      0.0%   iou 0.000  vol nan%
+SiteSurface                  28    100.0%      0.0%      0.0%   iou 1.000  vol nan%
+FormElem                     26    100.0%      0.0%      0.0%   iou 1.000  vol nan%
+AnalyticalPanel              23    100.0%      0.0%      0.0%   iou 0.000  vol nan%
+StairsSupport                16    100.0%      0.0%      0.0%   iou 0.609  vol nan%
+ArcWall                      14    100.0%      0.0%      0.0%   iou 0.959  vol 0.01%
+Text3dElem                   13     76.9%     23.1%      0.0%   iou 0.957  vol nan%
+SWallRectOpening             12    100.0%      0.0%      0.0%   iou 1.000  vol nan%
+StairsElement                 9    100.0%      0.0%      0.0%   iou 0.667  vol nan%
+StairsRun                     9    100.0%      0.0%      0.0%   iou 0.667  vol nan%
+BuildingPad                   9    100.0%      0.0%      0.0%   iou 1.000  vol 0.00%
+BlendElem                     8    100.0%      0.0%      0.0%   iou 1.000  vol nan%
+FamilyGeomCombination         8    100.0%      0.0%      0.0%   iou 1.000  vol nan%
+SweepElem                     6    100.0%      0.0%      0.0%   iou 1.000  vol nan%
+FaceRoof                      6    100.0%      0.0%      0.0%   iou 1.000  vol 0.00%
+TopRail                       6    100.0%      0.0%      0.0%   iou 1.000  vol nan%
+
+per year (all classes with >=5 elements with graphics):
+FamilyInstance         2020:100/0/0(n1980) 2021:100/0/0(n2279) 2022:99/1/0(n2254) 2023:100/0/0(n2284) 2024:99/0/0(n1908) 2025:99/0/0(n1865) 2026:99/0/0(n1865)
+CurveElem              2020:100/0/0(n2156) 2021:100/0/0(n2411) 2022:100/0/0(n2408) 2023:100/0/0(n2400) 2024:100/0/0(n1456) 2025:100/0/0(n1456) 2026:100/0/0(n1456)
+RbsDuctCurve           2020:100/0/0(n800) 2021:100/0/0(n800) 2022:100/0/0(n800) 2023:100/0/0(n800) 2024:100/0/0(n581) 2025:100/0/0(n581) 2026:100/0/0(n581)
+RbsPipeCurve           2020:100/0/0(n800) 2021:100/0/0(n800) 2022:100/0/0(n800) 2023:100/0/0(n800) 2024:100/0/0(n400) 2025:100/0/0(n400) 2026:100/0/0(n400)
+SWall                  2020:99/0/1(n411) 2021:99/0/1(n583) 2022:99/0/1(n583) 2023:99/0/1(n583) 2024:100/0/0(n144) 2025:100/0/0(n144) 2026:100/0/0(n144)
+RoomElem               2020:99/1/0(n343) 2021:99/1/0(n326) 2022:99/1/0(n326) 2023:99/1/0(n326) 2024:100/0/0(n50) 2025:100/0/0(n117) 2026:100/0/0(n117)
+RbsConduitCurve        2020:100/0/0(n39) 2021:100/0/0(n39) 2022:100/0/0(n39) 2023:100/0/0(n39) 2024:100/0/0(n400) 2025:100/0/0(n400) 2026:100/0/0(n400)
+RbsFlexDuctCurve       2020:100/0/0(n226) 2021:100/0/0(n226) 2022:100/0/0(n226) 2023:100/0/0(n226) 2024:100/0/0(n31) 2025:100/0/0(n31) 2026:100/0/0(n31)
+Ceiling                2020:100/0/0(n96) 2021:100/0/0(n199) 2022:100/0/0(n199) 2023:100/0/0(n199)
+WallSweep              2020:100/0/0(n44) 2021:100/0/0(n33) 2022:100/0/0(n33) 2023:100/0/0(n33) 2024:100/0/0(n103) 2025:100/0/0(n103) 2026:100/0/0(n103)
+Floor                  2020:100/0/0(n61) 2021:100/0/0(n85) 2022:100/0/0(n85) 2023:100/0/0(n85) 2024:100/0/0(n42) 2025:100/0/0(n42) 2026:100/0/0(n42)
+FilledRegion           2020:100/0/0(n83) 2021:100/0/0(n91) 2022:100/0/0(n91) 2023:100/0/0(n91) 2024:100/0/0(n22) 2025:100/0/0(n22) 2026:100/0/0(n22)
+BaseRailing            2020:100/0/0(n37) 2021:100/0/0(n72) 2022:100/0/0(n72) 2023:100/0/0(n72) 2024:100/0/0(n2) 2025:100/0/0(n2) 2026:100/0/0(n2)
+DPart                  2020:100/0/0(n45) 2021:100/0/0(n45) 2022:98/0/2(n46) 2023:100/0/0(n45) 2024:100/0/0(n1) 2025:100/0/0(n1) 2026:100/0/0(n1)
+Stairs                 2020:100/0/0(n16) 2021:100/0/0(n26) 2022:100/0/0(n26) 2023:100/0/0(n26)
+CableTray              2020:100/0/0(n17) 2021:100/0/0(n17) 2022:100/0/0(n17) 2023:100/0/0(n17)
+AnalyticalModelWall    2020:100/0/0(n25) 2021:100/0/0(n15) 2022:100/0/0(n15)
+ProfileRoof            2020:100/0/0(n4) 2021:100/0/0(n12) 2022:100/0/0(n12) 2023:100/0/0(n12) 2024:100/0/0(n5) 2025:100/0/0(n5) 2026:100/0/0(n5)
+ContFooting            2020:100/0/0(n13) 2021:100/0/0(n4) 2022:100/0/0(n4) 2023:100/0/0(n4) 2024:100/0/0(n9) 2025:100/0/0(n9) 2026:100/0/0(n9)
+Toposolid              2024:100/0/0(n14) 2025:100/0/0(n14) 2026:93/7/0(n14)
+SweepHost              2020:100/0/0(n5) 2021:100/0/0(n3) 2022:100/0/0(n3) 2023:100/0/0(n3) 2024:100/0/0(n9) 2025:100/0/0(n9) 2026:100/0/0(n9)
+ShaftOpening           2020:100/0/0(n4) 2021:100/0/0(n10) 2022:100/0/0(n10) 2023:100/0/0(n10) 2024:100/0/0(n1) 2025:100/0/0(n1) 2026:100/0/0(n1)
+AnalyticalModelSlab    2020:100/0/0(n8) 2021:100/0/0(n8) 2022:100/0/0(n8)
+ExtrusionElem          2020:100/0/0(n6) 2021:100/0/0(n9) 2022:100/0/0(n9) 2023:100/0/0(n9)
+MassLevelData          2020:100/0/0(n2) 2021:100/0/0(n10) 2022:100/0/0(n10) 2023:100/0/0(n10)
+SiteSurface            2020:100/0/0(n10) 2021:100/0/0(n6) 2022:100/0/0(n6) 2023:100/0/0(n6)
+FormElem               2020:100/0/0(n2) 2021:100/0/0(n2) 2022:100/0/0(n2) 2023:100/0/0(n2) 2024:100/0/0(n6) 2025:100/0/0(n6) 2026:100/0/0(n6)
+AnalyticalPanel        2023:100/0/0(n23)
+StairsSupport          2020:100/0/0(n10) 2021:100/0/0(n2) 2022:100/0/0(n2) 2023:100/0/0(n2)
+ArcWall                2020:100/0/0(n2) 2024:100/0/0(n4) 2025:100/0/0(n4) 2026:100/0/0(n4)
+Text3dElem             2020:100/0/0(n4) 2021:100/0/0(n2) 2022:100/0/0(n2) 2023:100/0/0(n2) 2024:0/100/0(n1) 2025:0/100/0(n1) 2026:0/100/0(n1)
+SWallRectOpening       2021:100/0/0(n4) 2022:100/0/0(n4) 2023:100/0/0(n4)
+StairsElement          2020:100/0/0(n6) 2021:100/0/0(n1) 2022:100/0/0(n1) 2023:100/0/0(n1)
+StairsRun              2020:100/0/0(n6) 2021:100/0/0(n1) 2022:100/0/0(n1) 2023:100/0/0(n1)
+BuildingPad            2020:100/0/0(n3) 2021:100/0/0(n2) 2022:100/0/0(n2) 2023:100/0/0(n2)
+BlendElem              2020:100/0/0(n2) 2021:100/0/0(n2) 2022:100/0/0(n2) 2023:100/0/0(n2)
+FamilyGeomCombination  2020:100/0/0(n2) 2021:100/0/0(n2) 2022:100/0/0(n2) 2023:100/0/0(n2)
+SweepElem              2021:100/0/0(n2) 2022:100/0/0(n2) 2023:100/0/0(n2)
+FaceRoof               2021:100/0/0(n2) 2022:100/0/0(n2) 2023:100/0/0(n2)
+TopRail                2024:100/0/0(n2) 2025:100/0/0(n2) 2026:100/0/0(n2)
+
+(40176 type/symbol definition rows excluded; 798 rows judged against the same element in another year's Revit dump of the same model, because their own year's dump lacks them)
+
+not solids (2D / annotation / system / container classes, excluded from the solid criterion): Dimension (3), ElementGroup (843), FamilySymbol (4645), GuideGrid (18), ImportInstance (18), LegendComponent (7536), LegendComponentGRepHolder (103), RbsPipingSystem (168), SketchGrid (2292), TextNote (4992)
+sheet-like classes (zero-volume faces; counted ACCURATE when a mesh exists - validated vs the oracle): AnalyticalModelBeam (2383), AnalyticalModelColumn (2218), AnalyticalModelSlab (34), AnalyticalModelSurface (5), AnalyticalModelWall (55), AnalyticalPanel (26), FilledRegion (425), MassLevelData (32), SiteSurface (28)
+classes judged by the oracle comparison only (mesh exists; stored bbox includes child elements, Revit gives no Volume): BaseRailing (259), StairsElement (9), StairsRun (9), StairsSupport (16)
+
+```
