@@ -80,7 +80,7 @@ def bucket(r):
     if iou is None or iou < 0.5: return 'box_only'
     return 'accurate' if iou >= 0.95 else 'true_off'
 ORACLE_ONLY = {'BaseRailing', 'StairsRun', 'StairsElement', 'StairsSupport'}
-SHEET = {'AnalyticalModelSurface', 'AnalyticalModelWall', 'AnalyticalModelSlab', 'AnalyticalModelFloor', 'AnalyticalPanel', 'AnalyticalModelColumn', 'AnalyticalModelBeam', 'FilledRegion', 'MassLevelData'}   # sheet-like elements
+SHEET = {'AnalyticalModelSurface', 'AnalyticalModelWall', 'AnalyticalModelSlab', 'AnalyticalModelFloor', 'AnalyticalPanel', 'AnalyticalModelColumn', 'AnalyticalModelBeam', 'FilledRegion', 'MassLevelData', 'SiteSurface'}   # sheet-like elements
 NONSOLID = {'GuideGrid', 'RbsPipingSystem', 'RbsDuctingSystem', 'LegendComponent', 'LegendComponentGRepHolder', 'SketchGrid', 'ImportInstance', 'ElementGroup', 'FamilySymbol', 'DetailLine', 'TextNote', 'Dimension'}   # annotation / 2D / container classes: no solid to compare (reported in the footer)
 def geometric(c, v):
     if c in NONSOLID or c.endswith('FamSym') or c.endswith('Symbol'): return False      # type definitions (incl. per-panel / per-mullion derived symbols): the placed panels and mullions are counted as FamilyInstance
