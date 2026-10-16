@@ -26,6 +26,8 @@ def _mesh(doc, eid, detail):
     if not m['tris'] or not m.get('nid') or len(m['nid']) != len(m['tris']): return None
     return m
 
+_FORM_NODE_CATS = {-2001060, -2008087, -2001120, -2001040}      # electrical fixtures, lighting devices, lighting fixtures, electrical equipment: the categories the node rule was validated on (rme_basic 2020: 926/926); structural families regressed (2026 Snowdon Structural -482 volumes)
+
 def _drop_form_nodes(doc, eid, m, detail):
     """Revit's Volume/Area ignore a symbol geometry node whose GInfo.m_controlCommand has bit 26 (0x4000000) without bit 15 (0x8000) when another node remains
     (rme_basic 2020: electrical fixtures cc [0, 0x4000000] -> only the first solid, Passive Infrared devices [0x8000, 0x4008000] -> both; 3/3 and 2/2 samples). Single-instance symbols only."""
@@ -90,8 +92,13 @@ def geom_params(doc, eid, f, cat, cls='FamilyInstance'):
         return out
     m = _mesh(doc, eid, volume_detail(doc))
     if m is None: return {'Volume': 0.0, 'Area': 0.0} if cls == 'FamilyInstance' and cat not in (CAT_PANEL,) else out
-    if cls == 'FamilyInstance' and m.get('source') == 'symbol_instance': m = _drop_form_nodes(doc, eid, m, volume_detail(doc))
+    if cls == 'FamilyInstance' and m.get('source') == 'symbol_instance' and cat in _FORM_NODE_CATS: m = _drop_form_nodes(doc, eid, m, volume_detail(doc))
     vol, closed, area, _ = M.volume_by_node(m['tris'], m.get('meta'), m['nid'], fid=m.get('fid'))
+    if cat == -2008049 and cls == 'FamilyInstance' and volume_detail(doc) == 2:       # pipe fittings: Revit's Volume is the Fine solid even in files whose other families follow Medium (rme_basic 2020, 40 samples: every fitting whose Medium and Fine bodies differ matches Fine); Area stays Medium (exact)
+        m3 = _mesh(doc, eid, 3)
+        if m3 is not None:
+            v3, c3, _a3, _ = M.volume_by_node(m3['tris'], m3.get('meta'), m3['nid'], fid=m3.get('fid'))
+            if c3 and v3 > 0: vol, closed = v3, c3
     if closed and vol > 0: out['Volume'] = float(vol)
     if cls != 'FamilyInstance': return out
     if cat == CAT_PANEL:

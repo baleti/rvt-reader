@@ -252,6 +252,26 @@ def params(path, geom=None):
         p_ = o_['params']; t_ = p_.get('Type Id'); fn_ = (out.get(t_) or {}).get('params', {}).get('Family Name') if isinstance(t_, int) else None
         if isinstance(fn_, str) and 'Round' in fn_ and isinstance(p_.get('Width'), float) and isinstance(p_.get('Length'), float):
             p_['Diameter'] = p_['Width']; p_['Area'] = math.pi * p_['Width'] * p_['Length']
+    # RebarInSystem (area reinforcement members): bars decoded by rvt_rebar.area_reinforcement_bars (Bar Length, Quantity, Spacing exact on rst_basic 2020; Layout Rule 2)
+    ris_ = collections.defaultdict(list)
+    for e_, o_ in out.items():
+        if o_['class'] == 'RebarInSystem':
+            sid_ = recs[e_]['fields'].get('m_systemId')
+            if sid_ is not None: ris_[_sid(sid_)].append(e_)
+    if ris_ and not os.environ.get('RVT_NORIS'):
+        try: import rvt_rebar as RB
+        except Exception: RB = None
+        for sid_, mem_ in ris_.items():
+            try: res_ = RB.area_reinforcement_bars(path, sid_) if RB else None
+            except Exception: res_ = None
+            for e_ in mem_:
+                v_ = (res_ or {}).get(e_)
+                if not v_ or not v_.get('bars'): continue
+                bars_ = v_['bars']; ln_ = [sum(math.dist(c['p0'], c['p1']) for c in b_ if c.get('type') == 'line') for b_ in bars_]
+                p_ = out[e_]['params']
+                _setp(p_, 'Bar Length', 'Double', ln_[0]); _setp(p_, 'Quantity', 'Integer', len(bars_)); _setp(p_, 'Total Bar Length', 'Double', float(sum(ln_))); _setp(p_, 'Layout Rule', 'Integer', 2)
+                _setp(p_, 'Spacing', 'Double', math.dist(bars_[0][0]['p0'], bars_[1][0]['p0']) if len(bars_) > 1 else 0.0)
+                if isinstance(v_.get('diameter'), float): _setp(p_, 'Reinforcement Volume', 'Double', float(sum(ln_)) * math.pi * (v_['diameter'] / 2) ** 2)
     for o_ in out.values():                                          # rebar: volume = total bar length x bar cross-section (Bar Diameter follows from the bar type by the learned rules)
         if o_['class'] != 'Rebar': continue
         p_ = o_['params']; t_ = p_.get('Total Bar Length|Double'); bd_ = next((v_ for k_, v_ in p_.items() if k_.split('|')[0] == 'Bar Diameter' and isinstance(v_, float)), None)
