@@ -145,6 +145,11 @@ def params(path, geom=None):
                 if isinstance(oi_.get('m_layoutRule'), int): _setp(d, 'Layout Rule', 'Integer', oi_['m_layoutRule'])
                 _setp(d, 'Spacing', 'Double', oi_['m_maxSpacing'] if oi_.get('m_layoutRule') in (2, 3) and isinstance(oi_.get('m_maxSpacing'), float) else 0.0)
                 _setp(d, 'Total Bar Length', 'Double', q_ * oi_['m_barLength'])
+        elif c == 'ReferencePoint':                                      # analytical reference points: Associated Level = the level nearest to the point's z, offset = z - level elevation (2023 rst_advanced samples 4/4 exact; unvalidated at scale)
+            o_ = F.S_(f, 'm_Trf', 'm_or') or F.S_(f, 'm_ExplicitTrf', 'm_or')
+            if isinstance(o_, list) and len(o_) == 3 and lv:
+                z_, e_ = min((abs(z_ - o_[2]), (z_, e_)) for e_, z_ in lv.items())[1]          # the NEAREST level (2023 rst_advanced: 471 on-level + 28 points below a level)
+                _setp(d, 'Associated Level', 'ElementId', int(e_)); _setp(d, 'Associated Level Offset', 'Double', o_[2] - z_)
         elif c == 'AnalyticalMember':                                    # end releases: m_cellList cells with m_releaseType (start, end); fixed (0) = no moment released, otherwise start Mx/My/Mz = 0/1/1, end 1/1/1 (2023 rst_advanced: 393 + 4 + 203 members, all exact)
             rt_ = [((c_.get('obj') if isinstance(c_, dict) else None) or {}).get('m_releaseType') for c_ in (((f.get('m_cellList') or {}).get('obj') or {}).get('m_cells') or [])]
             rt_ = [v_ for v_ in rt_ if isinstance(v_, int)]
@@ -269,10 +274,44 @@ def params(path, geom=None):
             top_, bot_ = {0: (z_, z_ - dep_), 1: (z_ + dep_ / 2, z_ - dep_ / 2), 2: (z_ + dep_, z_)}[zj_]
         elif abs(so_ - eo_) < 1e-6 and zj_ in (0, 1, 2): continue
         _setp(p_, 'Elevation at Top', 'Double', top_); _setp(p_, 'Elevation at Bottom', 'Double', bot_)
+    # reference points: Location Mark = the two nearest non-parallel straight grids with the signed plan offset in mm (positive towards +x / +y), letters before digits, '(0)' omitted (2023 rst_advanced: 467 of 499 exact; curved grids not handled)
+    gr_ = []
+    for e_, r_ in recs.items():
+        if r_['class'] != 'Grid' or e_ not in out: continue
+        sf_ = (F.S_(r_['fields'], 'm_pSurface') or {}); sf_ = sf_.get('obj', sf_) if isinstance(sf_, dict) else {}
+        nm_ = out[e_]['params'].get('Name')
+        if not isinstance(sf_, dict) or 'm_origin' not in sf_ or not isinstance(nm_, str): continue
+        for k_ in ('m_xVec', 'm_yVec'):
+            v_ = sf_.get(k_)
+            if isinstance(v_, list) and len(v_) == 3 and abs(v_[2]) < 1e-6 and math.hypot(v_[0], v_[1]) > 0.5:
+                h_ = math.hypot(v_[0], v_[1]); gr_.append((nm_, sf_['m_origin'][0], sf_['m_origin'][1], v_[0] / h_, v_[1] / h_)); break
+    if len(gr_) >= 2:
+        def _lm_n(g_):
+            nx_, ny_ = -g_[4], g_[3]
+            return (nx_, ny_) if (nx_ + ny_) > 1e-9 or (abs(nx_ + ny_) <= 1e-9 and nx_ - ny_ > 0) else (-nx_, -ny_)
+        def _lm(t_):
+            cand_ = sorted(((abs((t_[0] - g_[1]) * _lm_n(g_)[0] + (t_[1] - g_[2]) * _lm_n(g_)[1]), g_) for g_ in gr_), key=lambda z_: z_[0])
+            pick_ = []
+            for dist_, g_ in cand_:
+                if all(abs(g_[3] * q_[3] + g_[4] * q_[4]) < 0.5 for _d, q_ in pick_): pick_.append((dist_, g_))
+                if len(pick_) == 2: break
+            if len(pick_) < 2: return None
+            parts_ = []
+            for _d, g_ in pick_:
+                mm_ = round(((t_[0] - g_[1]) * _lm_n(g_)[0] + (t_[1] - g_[2]) * _lm_n(g_)[1]) * 304.8)
+                parts_.append(g_[0] if mm_ == 0 else '%s(%d)' % (g_[0], mm_))
+            return '-'.join(sorted(parts_, key=lambda q_: (q_[0].isdigit(), q_)))
+        for e_, o_ in out.items():
+            if o_['class'] == 'ReferencePoint': t_ = F.S_(recs[e_]['fields'], 'm_Trf', 'm_or'); nm_ = 'Location Mark'
+            elif o_['class'] == 'FamilyInstance' and o_['params'].get('Category|ElementId') == -2001330: t_ = F.S_(recs[e_]['fields'], 'm_pInstanceInfo', 'm_Trf', 'm_or'); nm_ = 'Column Location Mark'      # structural columns: same mark at the column's base point
+            else: continue
+            if not isinstance(t_, list) or len(t_) < 2: continue
+            v_ = _lm(t_)
+            if v_: _setp(o_['params'], nm_, 'String', v_)
     if not os.environ.get('RVT_NOHOST'): _host_params(out, recs)
     if not os.environ.get('RVT_NOVIEWSHEET'): _view_sheet_params(out, recs)
     _thermal_params(out, recs); _material_type(out, recs)
-    _circuit_params(out, recs); _wire_params(out, recs); _fi_circuit_params(out, recs); _fi_system_params(out, recs); _hub_params(out, recs)
+    _circuit_params(out, recs); _wire_params(out, recs); _fi_circuit_params(out, recs); _fi_system_params(out, recs); _hub_params(out, recs, _file_year(path))
     # round ducts (type Family Name 'Round Duct'): Area = pi d L and a Diameter, not the rectangular 2 (w + h) L
     for o_ in out.values():
         if o_['class'] != 'RbsDuctCurve': continue
@@ -333,6 +372,15 @@ def params(path, geom=None):
         if isinstance(t_, int) and t_ in out:
             sc_ = out[t_]['params'].get('System Classification')
             if isinstance(sc_, str) and not any(k_.split('|')[0] == 'System Classification' for k_ in p_): _setp(p_, 'System Classification', 'String', sc_)
+    # pipes: Invert Elevation = reference level elevation + the inside bottom of the lowest end (outer Bottom Elevation + wall thickness for horizontal / sloped pipes, the lowest end itself for vertical ones); rme_basic 2020: 513756 47.105 = 35.761 + 11.335 + 0.0087
+    for e_, o_ in out.items():
+        if o_['class'] != 'RbsPipeCurve': continue
+        p_ = o_['params']; bot_, top_, od_ = p_.get('Bottom Elevation'), p_.get('Top Elevation'), p_.get('Outside Diameter')
+        rl_ = p_.get('Reference Level|ElementId', p_.get('Reference Level'))
+        if not all(isinstance(v_, float) for v_ in (bot_, top_, od_)) or not isinstance(rl_, int) or rl_ not in lv: continue
+        wt_ = p_.get('Wall Thickness') if isinstance(p_.get('Wall Thickness'), float) else 0.0
+        vert_ = abs((top_ - bot_) - od_) > 1e-6 and (top_ - bot_) > 1.5 * od_
+        _setp(p_, 'Invert Elevation', 'Double', lv[rl_] + bot_ + (0.0 if vert_ else wt_))
     # MEP system sections: a system (RbsHvacSystem / RbsPipingSystem) lists its members per section (m_rgSections[].m_rgSection[].m_id); the member's Section is the section it belongs to
     # (an element shared by several sections: the section where it is the second end, else the first end; measured 1020 of 1036 on rme_basic) and its System Name the system's m_strName
     sec_ = collections.defaultdict(list)
@@ -363,7 +411,7 @@ def params(path, geom=None):
             for k_, v_ in out[ow]['params'].items():
                 if k_.split('|')[0] in INH: o_['params'][k_] = v_
             for k_, v_ in out[ow]['params'].items():
-                if (' End ' in k_ and 'Elevation' in k_) or k_.split('|')[0] in ('Area', 'Wall Thickness', 'Top Elevation', 'Bottom Elevation', 'Middle Elevation'): o_['params'].setdefault(k_, v_)
+                if (' End ' in k_ and 'Elevation' in k_) or k_.split('|')[0] in ('Area', 'Wall Thickness', 'Top Elevation', 'Bottom Elevation', 'Middle Elevation', 'Invert Elevation'): o_['params'].setdefault(k_, v_)
     # OmniClass Title follows from the OmniClass Number (standard table; omniclass_titles.json holds the 73 numbers seen in the corpus, one title each)
     try: _OT = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'omniclass_titles.json')))
     except Exception: _OT = {}
@@ -592,7 +640,7 @@ def _fi_system_params(out, recs):
         if names: _setp(o_['params'], 'System Name', 'String', ','.join(names))
         if len(types) == 1 and len(names) == 1: _setp(o_['params'], 'System Classification', 'String', _SYSCLASS[next(iter(types))])
 
-def _hub_params(out, recs):
+def _hub_params(out, recs, yr=None):
     """analytical nodes (Hub) and their reference points: Connection Status 2 when two or more analytical members meet at the node, else 0"""
     for e_, o_ in out.items():
         if o_['class'] != 'Hub': continue
@@ -601,7 +649,8 @@ def _hub_params(out, recs):
         if not isinstance(cm, list): continue
         n = sum(len((cn.get('obj', cn) if isinstance(cn, dict) else {}).get('m_arrRefs') or []) for cn in cm)
         k1 = {recs[int(a['m_id'])]['class'] for cn in cm for a in (cn.get('obj', cn) if isinstance(cn, dict) else {}).get('m_arrRefs') or [] if int(a['m_id']) in recs}
-        st = 2 if n >= 2 or (k1 & {'AnalyticalModelBeam', 'AnalyticalModelSlab'}) else 0      # one member alone: beams / slabs report 2, columns mostly 0 (rst_basic: 21 of 28 columns are 2: remainder open)
+        st = 1 if n >= 2 or (k1 & {'AnalyticalModelBeam', 'AnalyticalModelSlab', 'AnalyticalMember'}) else 0      # one member alone: beams / slabs report connected, columns mostly not (rst_basic: 21 of 28 columns connected: remainder open; 2023 analytical members: 197 of 264 single-member hubs connected)
+        if st and not (yr and yr.isdigit() and int(yr) >= 2023): st = 2             # the enum value of 'connected' is 2 in Revit 2020-2022 (gt: 2/0) and 1 in 2023 (gt: 1/0)
         _setp(o_['params'], 'Connection Status', 'Integer', st)
         for c_ in F.S_(f, 'm_cellList', 'm_cells') or []:
             pt = F.S_(c_, 'm_pointId') if isinstance(c_, dict) else None
