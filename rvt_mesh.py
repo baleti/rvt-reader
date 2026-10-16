@@ -153,6 +153,23 @@ def _snap_to_plane(oev, psd, u, v):
     except Exception: pass
     return u, v
 
+_FEI = [None, 0, None]
+def _face_edges(edges, h):
+    """(eid, edge) pairs of the edges bordering face h, in the dict's own order. The edge table is indexed once per table (face -> edge ids): the former scan of ALL edges per
+    face was quadratic (2026 Site toposolid: 10k faces x 15k edges = 300 s; identical result, RVT_FEI_OFF=1 restores the scan)"""
+    if os.environ.get('RVT_FEI_OFF'): return list(edges.items())
+    c = _FEI
+    if c[0] is not edges or c[1] != len(edges):
+        idx = {}
+        for eid, e in edges.items():
+            for r in (e.get('m_pFace') or []):
+                f_ = r.get('ref') if isinstance(r, dict) else None
+                if f_ is not None:
+                    l_ = idx.setdefault(f_, [])
+                    if not l_ or l_[-1] != eid: l_.append(eid)
+        c[0], c[1], c[2] = edges, len(edges), idx
+    return [(eid, edges[eid]) for eid in c[2].get(h, ())]
+
 def face_loops_uv(h, edges, surfs=None, allow_gaps=False, out_mine=None):
     """closed loops of face h in its uv space. Edge pointers (m_next[side]) give the loop order; geometric cycle extraction is the fallback.
     surfs = {handle: (kind, ev, surface_dict)}: when this face is planar and the neighbour across an edge is curved, the stored edge samples are densified through the
@@ -163,7 +180,7 @@ def face_loops_uv(h, edges, surfs=None, allow_gaps=False, out_mine=None):
     if me and me[0] == 'plane':
         sd = _ob(me[2]); o = np.array(_v(sd['m_origin'])); xv = np.array(_v(sd['m_xVec'])); yv = np.array(_v(sd['m_yVec']))
         plane_inv = lambda P: ((P - o) @ xv, (P - o) @ yv)
-    for eid, e in edges.items():
+    for eid, e in _face_edges(edges, h):
         refs = [r.get('ref') if isinstance(r, dict) else None for r in (e.get('m_pFace') or [])]
         if h in refs:
             side = refs.index(h); fl = e['m_firstAndLastEdgePnts']

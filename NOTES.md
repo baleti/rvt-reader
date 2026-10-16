@@ -765,3 +765,58 @@ ALL    60   8976010              93.7     93.8
       992 True Power [Double]
 
 ```
+
+## 2017 geometry fidelity (c5-geometry, 2026-10-16; fid_table_old.py over fidold/, FID_TABLE_2017.txt)
+Revit 2017 has no oracle dump, so each 2017 file is compared with the Revit 2020/2021 dump of the SAME model (element ids survive the upgrade): 2017 rst_basic, rst_advanced, Arch_Link, rme_basic (4 files, about 6.5k placed elements judged with the same criteria as the 2020-2026 table). Not yet done: 2017 rme_advanced (cold extract is slow and the host1 job was OOM-killed at 4.9 GB peak), rac_advanced (no matching dump), and all of 2018/2019. Result: FamilyInstance 100% accurate (n=1511), SWall 99.3%, RoomElem 99.4%, Ceiling/Floor/DPart/MEP curves/Stairs/ProfileRoof 100%.
+```
+class                      n   ACCURATE   true-off   box-only   (median IoU, median |vol err| where Revit gives Volume)
+CurveElem                  1608    100.0%      0.0%      0.0%   iou nan  vol nan%
+FamilyInstance             1511    100.0%      0.0%      0.0%   iou 0.969  vol 0.00%
+RbsDuctCurve                400    100.0%      0.0%      0.0%   iou 1.000  vol nan%
+RbsPipeCurve                400    100.0%      0.0%      0.0%   iou 1.000  vol nan%
+SWall                       302     99.3%      0.0%      0.7%   iou 0.977  vol 0.00%
+RoomElem                    163     99.4%      0.6%      0.0%   iou 1.000  vol 0.00%
+RbsFlexDuctCurve            113    100.0%      0.0%      0.0%   iou 1.000  vol nan%
+Ceiling                      91    100.0%      0.0%      0.0%   iou 1.000  vol 0.00%
+FilledRegion                 78    100.0%      0.0%      0.0%   iou 0.000  vol nan%
+Floor                        48    100.0%      0.0%      0.0%   iou 1.000  vol 0.00%
+DPart                        45    100.0%      0.0%      0.0%   iou 1.000  vol 0.00%
+BaseRailing                  36    100.0%      0.0%      0.0%   iou 0.833  vol nan%
+RbsConduitCurve              20    100.0%      0.0%      0.0%   iou 1.000  vol nan%
+WallSweep                    17    100.0%      0.0%      0.0%   iou 1.000  vol nan%
+AnalyticalModelWall          15    100.0%      0.0%      0.0%   iou 0.000  vol nan%
+Stairs                       13    100.0%      0.0%      0.0%   iou 1.000  vol nan%
+AnalyticalModelSlab           8    100.0%      0.0%      0.0%   iou 0.000  vol nan%
+ShaftOpening                  8    100.0%      0.0%      0.0%   iou 1.000  vol nan%
+MassLevelData                 6    100.0%      0.0%      0.0%   iou 0.000  vol nan%
+ProfileRoof                   6    100.0%      0.0%      0.0%   iou 1.000  vol 0.04%
+ExtrusionElem                 5    100.0%      0.0%      0.0%   iou 1.000  vol nan%
+
+per year (all classes with >=5 elements with graphics):
+CurveElem              2017:100/0/0(n1608)
+FamilyInstance         2017:100/0/0(n1511)
+RbsDuctCurve           2017:100/0/0(n400)
+RbsPipeCurve           2017:100/0/0(n400)
+SWall                  2017:99/0/1(n302)
+RoomElem               2017:99/1/0(n163)
+RbsFlexDuctCurve       2017:100/0/0(n113)
+Ceiling                2017:100/0/0(n91)
+FilledRegion           2017:100/0/0(n78)
+Floor                  2017:100/0/0(n48)
+DPart                  2017:100/0/0(n45)
+BaseRailing            2017:100/0/0(n36)
+RbsConduitCurve        2017:100/0/0(n20)
+WallSweep              2017:100/0/0(n17)
+AnalyticalModelWall    2017:100/0/0(n15)
+Stairs                 2017:100/0/0(n13)
+AnalyticalModelSlab    2017:100/0/0(n8)
+ShaftOpening           2017:100/0/0(n8)
+MassLevelData          2017:100/0/0(n6)
+ProfileRoof            2017:100/0/0(n6)
+ExtrusionElem          2017:100/0/0(n5)
+
+(2276 type/symbol definition rows excluded; 0 rows judged against the same element in another year's Revit dump of the same model, because their own year's dump lacks them)
+
+not solids (2D / annotation / system / container classes, excluded from the solid criterion): Dimension (1), ElementGroup (80), FamilySymbol (532), ImportInstance (4), LegendComponent (419), LegendComponentGRepHolder (4), RbsPipingSystem (7), SketchGrid (192), TextNote (693)
+sheet-like classes (zero-volume faces; counted ACCURATE when a mesh exists - validated vs the oracle): AnalyticalModelBeam (782), AnalyticalModelColumn (538), AnalyticalModelSlab (10), AnalyticalModelWall (15), FilledRegion (78), MassLevelD
+```
