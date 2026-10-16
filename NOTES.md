@@ -904,3 +904,48 @@ ALL    60   8976010              94.1     94.2
       744 Static Pressure [Double]
       
 ```
+
+## 2017-2019 geometry fidelity, COMPLETE (c5-geometry, 2026-10-16 evening; fid_table_old.py over fidold/, FID_TABLE_2017_2019.txt; supersedes the 4-file 2017 section above)
+Revit 2017-2019 files have no oracle dump: each is compared with the Revit 2020/2021 dump of the SAME model (element ids survive the upgrade). 15 files: rst_basic, rst_advanced, Arch_Link, rme_basic, rme_advanced for each of 2017, 2018, 2019 (rac_advanced 2017/18 has no matching dump). Per year the classes are 99-100% in every row: FamilyInstance 100/100/99% (n 1911/1937/1950), SWall 99%, RoomElem 99%, MEP curves/Ceiling/Floor/Stairs/ProfileRoof 100%. Totals: FamilyInstance 99.8% (n=5798), SWall 99.1%, RoomElem 99.4%.
+```
+class                      n   ACCURATE   true-off   box-only   (median IoU, median |vol err| where Revit gives Volume)
+CurveElem                  6028    100.0%      0.0%      0.0%   iou nan  vol nan%
+FamilyInstance             5798     99.8%      0.2%      0.0%   iou 0.991  vol 0.00%
+RbsDuctCurve               2400    100.0%      0.0%      0.0%   iou 1.000  vol nan%
+RbsPipeCurve               2400    100.0%      0.0%      0.0%   iou 1.000  vol nan%
+SWall                      1311     99.1%      0.0%      0.9%   iou 0.977  vol 0.00%
+RoomElem                    978     99.4%      0.6%      0.0%   iou 1.000  vol 0.00%
+RbsFlexDuctCurve            678    100.0%      0.0%      0.0%   iou 1.000  vol nan%
+Ceiling                     402    100.0%      0.0%      0.0%   iou 1.000  vol 0.00%
+FilledRegion                249    100.0%      0.0%      0.0%   iou 0.000  vol nan%
+Floor                       207    100.0%      0.0%      0.0%   iou 1.000  vol 0.00%
+BaseRailing                 150    100.0%      0.0%      0.0%   iou 0.667  vol nan%
+DPart                       135    100.0%      0.0%      0.0%   iou 1.000  vol 0.00%
+RbsConduitCurve             117    100.0%      0.0%      0.0%   iou 1.000  vol nan%
+Stairs                       63    100.0%      0.0%      0.0%   iou 1.000  vol nan%
+WallSweep                    51    100.0%      0.0%      0.0%   iou 1.000  vol nan%
+CableTray                    51    100.0%      0.0%      0.0%   iou 1.000  vol nan%
+AnalyticalModelWall          45    100.0%      0.0%      0.0%   iou 0.000  vol nan%
+AnalyticalModelSlab          24    100.0%      0.0%      0.0%   iou 0.000  vol nan%
+ShaftOpening                 24    100.0%      0.0%      0.0%   iou 1.000  vol nan%
+ExtrusionElem                21    100.0%      0.0%      0.0%   iou 1.000  vol nan%
+MassLevelData                18    100.0%      0.0%      0.0%   iou 0.000  vol nan%
+ProfileRoof                  18    100.0%      0.0%      0.0%   iou 1.000  vol 0.04%
+ContFooting                  12    100.0%      0.0%      0.0%   iou 1.000  vol 0.00%
+SiteSurface                   9    100.0%      0.0%      0.0%   iou 1.000  vol nan%
+SWallRectOpening              9    100.0%      0.0%      0.0%   iou 1.000  vol nan%
+FormElem                      6    100.0%      0.0%      0.0%   iou 1.000  vol nan%
+StairsSupport                 6    100.0%      0.0%      0.0%   iou 0.238  vol nan%
+Text3dElem                    6    100.0%      0.0%      0.0%   iou 0.957  vol nan%
+BlendElem                     6    100.0%      0.0%      0.0%   iou 1.000  vol nan%
+FamilyGeomCombination         6    100.0%      0.0%      0.0%   iou 1.000  vol nan%
+
+per year (all classes with >=5 elements with graphics):
+CurveElem              2017:100/0/0(n2008) 2018:100/0/0(n2009) 2019:100/0/0(n2011)
+FamilyInstance         2017:100/0/0(n1911) 2018:100/0/0(n1937) 2019:99/1/0(n1950)
+RbsDuctCurve           2017:100/0/0(n800) 2018:100/0/0(n800) 2019:100/0/0(n800)
+RbsPipeCurve           2017:100/0/0(n800) 2018:100/0/0(n800) 2019:100/0/0(n800)
+SWall                  2017:99/0/1(n437) 2018:99/0/1(n437) 2019:99/0/1(n437)
+RoomElem               2017:99/1/0(n326) 2018:99/1/0(n326) 2019:99/1/0(n326)
+RbsFlexDuctCurve  
+```
