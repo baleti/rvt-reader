@@ -58,6 +58,13 @@ def symbol_params(path, symbol_id, _depth=0):
         elif vi is not None and not v0: v = vi
         else: v = v0
         out.setdefault(k, v)
+    for p_ in (F.S_(r['fields'], 'm_pParams', 'm_params') or []):          # built-in type values stored next to the family parameters, keyed by the unsigned negative built-in id (Width, Height, Assembly Code, ...)
+        try: bid_ = _sid(p_['m_paramId'])
+        except Exception: continue
+        if bid_ < -1000 and isinstance(p_.get('m_value'), float):
+            v_ = p_['m_str'] if p_.get('m_str') else p_['m_value']
+            out.setdefault(bid_, v_)
+            if PNAMES.get(str(bid_)): out.setdefault(PNAMES[str(bid_)], v_)
     # derived symbols (per-host variants of a type, e.g. a window symbol cut for one wall) carry m_masterId = the user-visible type: its values apply
     mid = r['fields'].get('m_masterId')
     if mid is not None and int(mid) not in (0xFFFFFFFF, 0xFFFFFFFFFFFFFFFF) and int(mid) != int(symbol_id) and _depth < 3:
@@ -140,6 +147,11 @@ def params(path, geom=None):
                 _setp(d, 'Total Bar Length', 'Double', q_ * oi_['m_barLength'])
         elif c == 'FamilyInstance':
             d.update(Gm.fam_instance(f, lv))
+            if sym is not None and isinstance(f.get('m_elevation'), float) and not any(k_.split('|')[0] == 'Head Height' for k_ in d):          # windows / doors: Head Height = sill (m_elevation) + type Height (-1001300)
+                for p_ in (F.S_(sym, 'm_pParams', 'm_params') or []):
+                    try: bid_ = _sid(p_['m_paramId'])
+                    except Exception: continue
+                    if bid_ == -1001300 and isinstance(p_.get('m_value'), float): _setp(d, 'Head Height', 'Double', f['m_elevation'] + p_['m_value']); break
             if sym is not None and 'm_isHostPanelSym' in sym:          # curtain panel: its (derived) symbol stores the cell size; wall-type panels report Volume 0
                 w = F.S_(sym, 'm_refs'); w = F.S_(w[0], 'm_width') if isinstance(w, list) and w else None
                 h = F.S_(sym, 'm_refs'); h = F.S_(h[0], 'm_height') if isinstance(h, list) and h else None
@@ -304,7 +316,7 @@ def params(path, geom=None):
             for k_, v_ in out[ow]['params'].items():
                 if k_.split('|')[0] in INH: o_['params'][k_] = v_
             for k_, v_ in out[ow]['params'].items():
-                if (' End ' in k_ and 'Elevation' in k_) or k_ in ('Area', 'Wall Thickness'): o_['params'].setdefault(k_, v_)
+                if (' End ' in k_ and 'Elevation' in k_) or k_.split('|')[0] in ('Area', 'Wall Thickness', 'Top Elevation', 'Bottom Elevation', 'Middle Elevation'): o_['params'].setdefault(k_, v_)
     # OmniClass Title follows from the OmniClass Number (standard table; omniclass_titles.json holds the 73 numbers seen in the corpus, one title each)
     try: _OT = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'omniclass_titles.json')))
     except Exception: _OT = {}
