@@ -150,6 +150,16 @@ def params(path, geom=None):
             if isinstance(o_, list) and len(o_) == 3 and lv:
                 z_, e_ = min((abs(z_ - o_[2]), (z_, e_)) for e_, z_ in lv.items())[1]          # the NEAREST level (2023 rst_advanced: 471 on-level + 28 points below a level)
                 _setp(d, 'Associated Level', 'ElementId', int(e_)); _setp(d, 'Associated Level Offset', 'Double', o_[2] - z_)
+        elif c == 'IndependentTag':                                      # Leader Line: a tagged entity with a non-zero elbow / end offset has a leader (2024 Snowdon Structural samples: offsets 0 -> 0, elbow offset set -> 1)
+            te_ = ((f.get('m_taggedEntitiesCell') or {}).get('obj') or {}).get('m_taggedEntities')
+            if isinstance(te_, list) and te_:
+                ld_ = 0
+                for t_ in te_:
+                    o_ = (t_.get('obj') if isinstance(t_, dict) else None) or {}
+                    for k_ in ('m_elbowOffset', 'm_endOffset'):
+                        xyz_ = (o_.get(k_) or {}).get('m_xyz')
+                        if isinstance(xyz_, list) and any(isinstance(v_, float) and abs(v_) > 1e-9 for v_ in xyz_): ld_ = 1
+                _setp(d, 'Leader Line', 'Integer', ld_)
         elif c == 'AnalyticalMember':                                    # end releases: m_cellList cells with m_releaseType (start, end); fixed (0) = no moment released, otherwise start Mx/My/Mz = 0/1/1, end 1/1/1 (2023 rst_advanced: 393 + 4 + 203 members, all exact)
             rt_ = [((c_.get('obj') if isinstance(c_, dict) else None) or {}).get('m_releaseType') for c_ in (((f.get('m_cellList') or {}).get('obj') or {}).get('m_cells') or [])]
             rt_ = [v_ for v_ in rt_ if isinstance(v_, int)]
@@ -418,6 +428,14 @@ def params(path, geom=None):
     for o_ in out.values():
         p_ = o_['params']; n_ = p_.get('OmniClass Number')
         if isinstance(n_, str) and n_ in _OT and not p_.get('OmniClass Title'): _setp(p_, 'OmniClass Title', 'String', _OT[n_])
+    # duct fitting families (formula parameters): OffsetWidth = Width1 / 2, OffsetHeight = Height1 / 2 (rme_basic 2020: 393414 .738 = 1.476 / 2, .779 = 1.558 / 2; 393568 .410 = .820 / 2)
+    for o_ in out.values():
+        if o_['class'] != 'FamilyInstance' or o_['params'].get('Category|ElementId') != -2008010: continue
+        p_ = o_['params']
+        for nm_, src_ in (('OffsetWidth', 'Width1'), ('OffsetHeight', 'Height1')):
+            v_ = p_.get(src_ + '|Double', p_.get(src_))
+            if not isinstance(v_, float): v_ = p_.get('Diameter|Double', p_.get('Diameter'))          # round fittings: half the diameter
+            if isinstance(v_, float) and not any(k_.split('|')[0] == nm_ for k_ in p_): _setp(p_, nm_, 'Double', v_ / 2)
     # Type IfcGUID: an instance carries its type's IfcGUID, a type element its own (both = ifcguid.from_unique(UniqueId) unless an IFC GUID is stored)
     for o_ in out.values():
         p_ = o_['params']
@@ -539,6 +557,13 @@ def _view_sheet_params(out, recs):
             _setp(d, 'Sheet Number', 'String', (r or {}).get('Sheet Number', '---')); _setp(d, 'Detail Number', 'String', (r or {}).get('Detail Number', '-'))
             sc = scale(recs[vw]['fields'])
             if sc: _setp(d, 'View Scale', 'Integer', sc); _setp(d, 'Scale Value    1:', 'Integer', sc)
+            # referencing view / sheet: a marker drawn in a view that is placed on a sheet references its target view from that sheet and detail number
+            hv = f.get('m_ownerDBViewId'); hv = int(hv) if hv is not None and hv not in _INVALID else None
+            if hv in info and hv != vw:
+                for tgt in (d, out[vw]['params'] if vw in out else None):
+                    if tgt is None: continue
+                    if isinstance(info[hv].get('Sheet Number'), str): _setp(tgt, 'Referencing Sheet', 'String', info[hv]['Sheet Number'])
+                    if isinstance(info[hv].get('Detail Number'), str): _setp(tgt, 'Referencing Detail', 'String', info[hv]['Detail Number'])
 def _wsize_key(sz):
     """sort key of a conductor size string, larger conductor = larger key: AWG '#14'..'#1' < '1/0'..'4/0' < kcmil / metric numbers"""
     t = sz.strip().lstrip('#')
