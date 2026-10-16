@@ -104,7 +104,7 @@ def params(path, geom=None):
             if o: lv[eid] = o[2]
     uid = rvt_uid.unique_ids(path)
     st = rvt_ifc.stored({e: [r] for e, r in recs.items()})
-    import rvt_scan as S; own = S.owners(path); out = {}
+    import rvt_scan as S; own = S.owners(path); out = {}; refelev_ = {}
     for eid, r in recs.items():
         c = r['class']; f = r['fields']; d = {}
         for pid, cands in MAPPING.get(c, {}).items():
@@ -145,8 +145,17 @@ def params(path, geom=None):
                 if isinstance(oi_.get('m_layoutRule'), int): _setp(d, 'Layout Rule', 'Integer', oi_['m_layoutRule'])
                 _setp(d, 'Spacing', 'Double', oi_['m_maxSpacing'] if oi_.get('m_layoutRule') in (2, 3) and isinstance(oi_.get('m_maxSpacing'), float) else 0.0)
                 _setp(d, 'Total Bar Length', 'Double', q_ * oi_['m_barLength'])
+        elif c == 'AnalyticalMember':                                    # end releases: m_cellList cells with m_releaseType (start, end); fixed (0) = no moment released, otherwise start Mx/My/Mz = 0/1/1, end 1/1/1 (2023 rst_advanced: 393 + 4 + 203 members, all exact)
+            rt_ = [((c_.get('obj') if isinstance(c_, dict) else None) or {}).get('m_releaseType') for c_ in (((f.get('m_cellList') or {}).get('obj') or {}).get('m_cells') or [])]
+            rt_ = [v_ for v_ in rt_ if isinstance(v_, int)]
+            if len(rt_) >= 2:
+                for nm_, v_, mm_ in (('Start', rt_[0], (0, 1, 1)), ('End', rt_[1], (1, 1, 1))):
+                    _setp(d, nm_ + ' Release', 'Integer', v_)
+                    for ax_, m_ in zip('xyz', mm_ if v_ else (0, 0, 0)): _setp(d, '%s M%s' % (nm_, ax_), 'Integer', m_)
         elif c == 'FamilyInstance':
             d.update(Gm.fam_instance(f, lv))
+            re_ = d.pop('_refelev', None)
+            if re_ is not None: refelev_[eid] = re_
             if sym is not None and isinstance(f.get('m_elevation'), float) and not any(k_.split('|')[0] == 'Head Height' for k_ in d):          # windows / doors: Head Height = sill (m_elevation) + type Height (-1001300)
                 for p_ in (F.S_(sym, 'm_pParams', 'm_params') or []):
                     try: bid_ = _sid(p_['m_paramId'])
@@ -242,6 +251,24 @@ def params(path, geom=None):
         if o['class'] == 'FamilyInstance' and 'Length' in o['params']:
             am = F.S_(recs[eid]['fields'], 'm_oFamInstUserData', 'm_analyticalModelId')
             if am is not None and int(am) in out and out[int(am)]['class'].startswith('AnalyticalModel'): out[int(am)]['params'].setdefault('Length', o['params']['Length'])
+    # structural framing: Elevation at Top / Bottom of horizontal members from the reference level + offset, the z justification and the section depth (type Height / Diameter); 0 for sloped members and 'origin' justification (rst_basic 2020 gt: 256+18 members)
+    for e_, re_ in refelev_.items():
+        o_ = out.get(e_)
+        if o_ is None or o_['params'].get('Category|ElementId') != -2001320: continue
+        p_ = o_['params']; so_, eo_ = p_.get('Start Level Offset'), p_.get('End Level Offset')
+        if not isinstance(so_, float) or not isinstance(eo_, float): continue
+        zj_ = p_.get('z Justification|Integer', p_.get('z Justification')); top_ = bot_ = 0.0
+        sid_ = F.S_(recs[e_]['fields'], 'm_pInstanceInfo', 'm_symbolId'); sym_ = recs.get(int(sid_), {}).get('fields') if sid_ is not None else None
+        dep_ = None
+        if sym_ is not None:
+            nv_ = F.named_values({}, cap, sym_)
+            for k_ in ('Height', 'Diameter', 'Depth', 'h', 'd'):
+                if k_ in nv_ and isinstance(nv_[k_][0], float) and nv_[k_][0] > 0: dep_ = nv_[k_][0]; break
+        if abs(so_ - eo_) < 1e-6 and dep_ is not None and zj_ in (0, 1, 2):
+            zo_ = p_.get('z Offset Value|Double', p_.get('z Offset Value')); z_ = re_ + so_ + (zo_ if isinstance(zo_, float) else 0.0)          # the instance's z offset (e.g. 0.1837 on the 50x200 timbers) shifts the member line
+            top_, bot_ = {0: (z_, z_ - dep_), 1: (z_ + dep_ / 2, z_ - dep_ / 2), 2: (z_ + dep_, z_)}[zj_]
+        elif abs(so_ - eo_) < 1e-6 and zj_ in (0, 1, 2): continue
+        _setp(p_, 'Elevation at Top', 'Double', top_); _setp(p_, 'Elevation at Bottom', 'Double', bot_)
     if not os.environ.get('RVT_NOHOST'): _host_params(out, recs)
     if not os.environ.get('RVT_NOVIEWSHEET'): _view_sheet_params(out, recs)
     _thermal_params(out, recs); _material_type(out, recs)
