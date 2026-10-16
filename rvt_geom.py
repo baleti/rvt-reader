@@ -92,7 +92,7 @@ def fam_instance(f, lvl):
     out = {}
     z = _g(f, 'm_pInstanceInfo', 'm_Trf', 'm_or')
     lv = None
-    for k in ('m_assocLevelId', 'm_idLevelStart', 'm_levelId'):
+    for k in ('m_assocLevelId', 'm_idLevelStart', 'm_levelId', 'm_scheduleOnlyLevelId'):
         v = f.get(k)
         if v is not None and int(v) in lvl: lv = lvl[int(v)]; break
     if z is not None and lv is not None: out['Elevation from Level'] = z[2] - lv
