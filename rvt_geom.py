@@ -109,4 +109,5 @@ def fam_instance(f, lvl):
         o, d_, (t0, t1) = crv['m_origin'], crv['m_dirVec'], crv['m_endParams']
         out.setdefault('Length', t1 - t0)
         out['Start Level Offset'] = o[2] + d_[2] * t0 - cd['m_refLevelElev']; out['End Level Offset'] = o[2] + d_[2] * t1 - cd['m_refLevelElev']
+        out['_refelev'] = cd['m_refLevelElev']
     return out
