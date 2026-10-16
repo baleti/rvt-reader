@@ -2,7 +2,7 @@
 
 ## Geometry (ACCEPTANCE.md): FID_TABLE_FINAL.txt, NOTES.md "FINAL per-class / per-year geometry table, refreshed 2026-10-16"
 Corpus 2020-2026 (60 of 61 gt4 files, final code): FamilyInstance 99.5% accurate (14,435 placed), SWall 99.3%, RoomElem 99.4%, Ceiling/Floor/ProfileRoof/SiteSurface/MEP curves 100%, Toposolid 97.6% (2026 Site toposolid: open mesh, 2.3% low volume, documented residual), Text3dElem 76.9% of 13 (one element, IoU 0.94 < 0.95).
-2017: 4 of 6 files vs the 2020/21 dump of the same model (FID_TABLE_2017.txt): FamilyInstance 100%, SWall 99.3%. Open: 2017 rme_advanced, rac_advanced, all of 2018/2019 (fid_old_h1.sh, needs a larger host1 memory window).
+2017-2019: 15 files vs the 2020/21 dump of the same model (FID_TABLE_2017_2019.txt): FamilyInstance 99.8% (n=5798), SWall 99.1%, RoomElem 99.4%, all other classes 100%. Not covered: rac_advanced (no matching dump).
 Speed: rvt_mesh.face_loops_uv quadratic edge scan fixed (_face_edges): 2024 Site 51.5 s -> 11.1 s on 7 elements, meshes identical.
 
 ## Parameters (OBJECTIVES.md #2): NOTES.md "Parameter reproduction, FINAL, all 60 gt4 files"
