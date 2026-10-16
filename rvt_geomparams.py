@@ -26,6 +26,21 @@ def _mesh(doc, eid, detail):
     if not m['tris'] or not m.get('nid') or len(m['nid']) != len(m['tris']): return None
     return m
 
+def _drop_form_nodes(doc, eid, m, detail):
+    """Revit's Volume/Area ignore a symbol geometry node whose GInfo.m_controlCommand has bit 26 (0x4000000) without bit 15 (0x8000) when another node remains
+    (rme_basic 2020: electrical fixtures cc [0, 0x4000000] -> only the first solid, Passive Infrared devices [0x8000, 0x4008000] -> both; 3/3 and 2/2 samples). Single-instance symbols only."""
+    try:
+        gg, ii = EM._geos_f(doc.rec(eid)['fields'], detail)
+        if gg or len(ii) != 1: return m
+        sid = int(EM._ob(ii[0]['m_instanceInfo']).get('m_symbolId')); sg, si = EM._geos_f(doc.rec(sid)['fields'], detail)
+        ccs = [int((g.get('m_GInfo') or {}).get('m_controlCommand') or 0) for g in sg]
+        fl = [int((g.get('m_GInfo') or {}).get('m_flags') or 0) for g in sg]
+        drop = {100000 + i for i, c in enumerate(ccs) if (c & 0x4000000) and not (c & 0x8000) and not (fl[i] & 0xE0)}      # nodes with flag bits 0xE0 (pipe fittings at Medium: cc [0x4008000, 0x4000000, 0x4000000], Revit counts all three) are not touched
+        if not drop or len(drop) >= len(ccs): return m
+        keep = [i for i, n in enumerate(m['nid']) if n not in drop]
+        return {k: ([v[i] for i in keep] if isinstance(v, list) and len(v) == len(m['nid']) else v) for k, v in m.items()}
+    except Exception: return m
+
 def volume_detail(doc):
     """detail level of Revit's computed Volume/Area for this file (2 = Medium up to Revit 2025, 3 = Fine from 2026)"""
     if getattr(doc, '_vdetail', None) is None:
@@ -75,6 +90,7 @@ def geom_params(doc, eid, f, cat, cls='FamilyInstance'):
         return out
     m = _mesh(doc, eid, volume_detail(doc))
     if m is None: return {'Volume': 0.0, 'Area': 0.0} if cls == 'FamilyInstance' and cat not in (CAT_PANEL,) else out
+    if cls == 'FamilyInstance' and m.get('source') == 'symbol_instance': m = _drop_form_nodes(doc, eid, m, volume_detail(doc))
     vol, closed, area, _ = M.volume_by_node(m['tris'], m.get('meta'), m['nid'], fid=m.get('fid'))
     if closed and vol > 0: out['Volume'] = float(vol)
     if cls != 'FamilyInstance': return out
@@ -93,6 +109,7 @@ def geom_params(doc, eid, f, cat, cls='FamilyInstance'):
             else: out['Width'] = out['Height'] = 0.0
         return out
     out['Area'] = float(area) / 2
+    if cat == -2008010: out.pop('Area', None)          # duct fittings: Revit's Area is not half the surface (0 of 311 right in rme_basic 2020; pipe fittings 119 of 119); better absent than wrong
     if cat == CAT_MULLION:
         tr = _trf(f)
         if tr is not None:
@@ -115,5 +132,18 @@ def room_params(doc, eid):
     for tri in T[bot]:
         for i in range(3):
             p, q = tuple(np.round(tri[i], 6)), tuple(np.round(tri[(i + 1) % 3], 6)); ed[(min(p, q), max(p, q))] += 1
-    per = sum(float(np.linalg.norm(np.array(p) - np.array(q))) for (p, q), k in ed.items() if k == 1)
+    bnd = [(p, q) for (p, q), k in ed.items() if k == 1]
+    adj = collections.defaultdict(list)
+    for i, (p, q) in enumerate(bnd): adj[p].append(i); adj[q].append(i)
+    seen = set(); loops = []
+    for i0 in range(len(bnd)):
+        if i0 in seen: continue
+        stack = [i0]; seen.add(i0); L = 0.0
+        while stack:                                                  # connected boundary component (outer loop or an island such as a column)
+            i = stack.pop(); p, q = bnd[i]; L += float(np.linalg.norm(np.array(p) - np.array(q)))
+            for v in (p, q):
+                for j in adj[v]:
+                    if j not in seen: seen.add(j); stack.append(j)
+        loops.append(L)
+    per = max(loops) if loops else 0.0                                # Revit's Perimeter is the outer boundary only (islands / columns excluded: Arch_Link 2023, 223193: 55.54 vs 58.68 with a 3.14 column)
     return {'Area': float(ln[bot].sum() / 2), 'Perimeter': per}
