@@ -105,6 +105,8 @@ def fam_instance(f, lvl):
     # beams / braces / slanted columns: the member line (m_pCurveDriver.m_pCrv, a line) gives Length and the end elevations relative to the reference level
     cd = f.get('m_pCurveDriver'); cd = cd.get('obj') if isinstance(cd, dict) else None
     crv = ((cd or {}).get('m_pCrv') or {}); crv = crv.get('obj', crv) if isinstance(crv, dict) else None
+    if crv and isinstance(crv.get('m_dirVec'), list) and isinstance(crv.get('m_origin'), list) and isinstance(crv.get('m_endParams'), list) and len(crv['m_endParams']) == 2 and isinstance(cd.get('m_refLevelElev'), float) and abs(cd['m_refLevelElev']) >= 1e20 and abs(crv['m_dirVec'][2]) < 1e-9:
+        out['_refelev'] = crv['m_origin'][2]           # member without a reference level (Snowdon 2026 structure): Revit's Reference Level Elevation = the z of its horizontal member line (gt: 932 beams)
     if crv and isinstance(crv.get('m_dirVec'), list) and isinstance(crv.get('m_origin'), list) and isinstance(crv.get('m_endParams'), list) and len(crv['m_endParams']) == 2 and isinstance(cd.get('m_refLevelElev'), float) and abs(cd['m_refLevelElev']) < 1e20:
         o, d_, (t0, t1) = crv['m_origin'], crv['m_dirVec'], crv['m_endParams']
         out.setdefault('Length', t1 - t0)

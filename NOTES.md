@@ -820,3 +820,87 @@ ExtrusionElem          2017:100/0/0(n5)
 not solids (2D / annotation / system / container classes, excluded from the solid criterion): Dimension (1), ElementGroup (80), FamilySymbol (532), ImportInstance (4), LegendComponent (419), LegendComponentGRepHolder (4), RbsPipingSystem (7), SketchGrid (192), TextNote (693)
 sheet-like classes (zero-volume faces; counted ACCURATE when a mesh exists - validated vs the oracle): AnalyticalModelBeam (782), AnalyticalModelColumn (538), AnalyticalModelSlab (10), AnalyticalModelWall (15), FilledRegion (78), MassLevelD
 ```
+
+## Parameter reproduction, FINAL, all 60 gt4 files (c5-geometry, 2026-10-16 afternoon; pout_c9 on host1 = rules from the TRAIN split, geometry-derived values on; before = pout_c2g)
+ALL 94.1% exact (86.5% before; 93.7% in the earlier pout_c5 table): 2020 94.7, 2021 95.3, 2022 95.3, 2023 94.6, 2024 93.0, 2025 92.9, 2026 91.9. Added since the 93.7% table: electrical/lighting node rule, room Area/Perimeter, MEP Section/System Name, pipe fitting Fine volume, rebar + RebarInSystem, beam level offsets, Head Height, built-in symbol values. Derived AFTER this run and validated on single files only (pout_c11: rst_basic 2020 96.60%, rst_advanced 2023 91.27%): structural Elevation at Top/Bottom (incl. z offset), AnalyticalMember releases.
+```
+year files    values  before%  exact%  exact+approx%   Double / Integer / String / ElementId exact%   not reproduced: a_lookup b_geom c_mep d_other (% of values)
+2020    6   1068534     89.7    94.7     94.8        85.0 / 96.3 / 93.2 / 99.7     1.0 2.3 1.2 0.6
+2021    9   1426259     90.6    95.3     95.5        86.8 / 96.5 / 93.1 / 99.7     1.0 2.1 0.9 0.6
+2022    9   1438591     90.7    95.3     95.4        87.1 / 96.5 / 92.7 / 99.7     1.0 2.0 0.9 0.6
+2023    9   1529686     88.2    94.6     94.7        88.0 / 91.9 / 93.6 / 99.3     1.9 1.8 0.9 0.7
+2024    9   1294307     80.1    93.0     93.2        83.5 / 96.9 / 97.2 / 98.4     0.9 2.4 2.3 1.2
+2025    9   1105074     79.4    92.9     93.0        83.8 / 95.7 / 96.5 / 98.5     1.3 2.2 1.9 1.6
+2026    9   1113559     84.7    91.9     92.0        81.7 / 95.2 / 96.1 / 98.0     1.5 2.3 2.0 2.2
+ALL    60   8976010              94.1     94.2
+== a_lookup_candidate 112929
+     3880 Leader Line [Integer]
+     3610 Family and Type [String]
+     3434 Connection Status [Integer]
+     3278 Column Location Mark [String]
+     2914 Sheet Number [String]
+     2731 Has Association [Integer]
+     2492 Referencing Sheet [String]
+     2476 Occupancy Unit [Integer]
+     2472 Ways [Integer]
+     2374 Export to IFC [Integer]
+     2319 Referencing Detail [String]
+     1946 Family [String]
+     1834 Host [String]
+     1699 Moves With Grids [Integer]
+     1699 Location Mark [String]
+     1699 Associated Level [ElementId]
+     1517 Far Clipping [Integer]
+     1470 Rebar Number [String]
+     1438 Sheet Name [String]
+     1419 Type [ElementId]
+     1403 Associated Level [String]
+     1368 Structural Material [ElementId]
+     1291 Detail Number [String]
+     1248 y Justification [Integer]
+     1233 Family [ElementId]
+== b_geom 191619
+    46158 Area [Double]
+    37536 Volume [Double]
+    16011 Invert Elevation [Double]
+     7078 Elevation at Bottom [Double]
+     6951 Length [Double]
+     6354 Elevation at Top [Double]
+     6116 Cut Length [Double]
+     6052 OffsetHeight [Double]
+     6052 OffsetWidth [Double]
+     4928 Slope [Double]
+     4088 End Join Cutback [Double]
+     3961 Elevation from Level [Double]
+     3333 Perimeter [Double]
+     2875 Unconnected Height [Double]
+     2669 Start Join Cutback [Double]
+     2476 Area per Person [Double]
+     2336 Takeoff Length Projection [Double]
+     2316 Cross-Section Rotation [Double]
+     1904 Width [Double]
+     1703 Elevation at Top Survey [Double]
+     1703 Elevation at Bottom Survey [Double]
+     1699 Associated Level Offset [Double]
+     1659 Height [Double]
+     1149 Total Bar Length [Double]
+     1071 Angle [Double]
+== c_mep 124439
+    30169 Pressure Drop [Double]
+    13361 Velocity Pressure [Double]
+    12686 System Type [ElementId]
+    11121 Flow [Double]
+    10180 Friction [Double]
+    10180 Velocity [Double]
+     9270 System Classification [String]
+     5880 Loss Coefficient [Double]
+     4107 Section [Integer]
+     3246 Relative Roughness [Double]
+     2348 Circuit Description [String]
+     2204 Additional Flow [Double]
+     1930 Electrical Data [String]
+     1627 Friction Factor [Double]
+     1016 System Length [Double]
+      744 Static Pressure [Double]
+      
+```
