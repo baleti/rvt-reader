@@ -160,6 +160,11 @@ def params(path, geom=None):
                         xyz_ = (o_.get(k_) or {}).get('m_xyz')
                         if isinstance(xyz_, list) and any(isinstance(v_, float) and abs(v_) > 1e-9 for v_ in xyz_): ld_ = 1
                 _setp(d, 'Leader Line', 'Integer', ld_)
+        if c in ('RoomElem', 'SpaceElem'):                               # default people heat gains (internal units) of every room (1288 of 1288 in the corpus) and 98% of spaces
+            for nm_, v_ in (('Latent Heat Gain per person', 630.91814901260966), ('Sensible Heat Gain per person', 788.6476862657621), ('Total Heat Gain per person', 1419.5658352783718)):
+                if not any(k_.split('|')[0] == nm_ for k_ in d): _setp(d, nm_, 'Double', v_)
+        if c in ('RoomElem', 'SpaceElem') and isinstance(f.get('m_dRoomCavityRatio'), float):       # lighting analysis value stored on the record (rme_basic 2020: 81 of 81 exact)
+            _setp(d, 'Room Cavity Ratio', 'Double', f['m_dRoomCavityRatio'])
         elif c == 'AnalyticalMember':                                    # end releases: m_cellList cells with m_releaseType (start, end); fixed (0) = no moment released, otherwise start Mx/My/Mz = 0/1/1, end 1/1/1 (2023 rst_advanced: 393 + 4 + 203 members, all exact)
             rt_ = [((c_.get('obj') if isinstance(c_, dict) else None) or {}).get('m_releaseType') for c_ in (((f.get('m_cellList') or {}).get('obj') or {}).get('m_cells') or [])]
             rt_ = [v_ for v_ in rt_ if isinstance(v_, int)]
@@ -176,6 +181,10 @@ def params(path, geom=None):
                     try: bid_ = _sid(p_['m_paramId'])
                     except Exception: continue
                     if bid_ == -1001300 and isinstance(p_.get('m_value'), float): _setp(d, 'Head Height', 'Double', f['m_elevation'] + p_['m_value']); break
+            for c_ in (((f.get('m_cellList') or {}).get('obj') or {}).get('m_cells') or []):          # structural members: join cutbacks stored in the cell (m_cutbacks = [start, end]; rst_basic 2020: 139 / 117 members exact)
+                cb_ = ((c_.get('obj') if isinstance(c_, dict) else None) or {}).get('m_cutbacks')
+                if isinstance(cb_, list) and len(cb_) == 2 and all(isinstance(v_, float) for v_ in cb_):
+                    _setp(d, 'Start Join Cutback', 'Double', cb_[0]); _setp(d, 'End Join Cutback', 'Double', cb_[1]); break
             if sym is not None and 'm_isHostPanelSym' in sym:          # curtain panel: its (derived) symbol stores the cell size; wall-type panels report Volume 0
                 w = F.S_(sym, 'm_refs'); w = F.S_(w[0], 'm_width') if isinstance(w, list) and w else None
                 h = F.S_(sym, 'm_refs'); h = F.S_(h[0], 'm_height') if isinstance(h, list) and h else None
