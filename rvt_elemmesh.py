@@ -164,6 +164,17 @@ def _inst_parts(doc, inst, bb, symbol_depth, detail, flags):
     return tris, metas, nids, fids
 
 def element_mesh(doc, eid, symbol_depth=2, detail=3):
+    m = _element_mesh0(doc, eid, symbol_depth, detail)
+    try:                                                                   # topography carries its material only as the instance parameter 'Material' (-1002107), no per-face render style
+        if m.get('tris') and doc.cls(eid) in ('SiteSurface', 'Toposolid') and all(x == -1 for x in (m.get('mat') or [-1])):
+            import rvt_params as RP
+            import rvt_materials as RM2
+            mid = RP.stored_params(RM2._ctx(doc.f).rec(eid)['fields']).get(-1002107)
+            if isinstance(mid, int) and mid > 0: m['mat'] = [mid] * len(m['tris'])
+    except Exception: pass
+    return m
+
+def _element_mesh0(doc, eid, symbol_depth=2, detail=3):
     rec = doc.rec(eid)
     if rec is None: return {'tris': [], 'source': 'none', 'flags': ['no_saved_graphics']}
     fl = rec['fields']; bb = fl.get('m_bBox'); geos, inst = _geos_f(fl, detail)

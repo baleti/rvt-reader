@@ -1038,3 +1038,18 @@ ALL    60   8976010              94.5     94.6
 Causes (reader, rvt_mesh.tessellate_geometry): (1) `_rect_grid` returned None when the two u-borders of a rectangle loop carry different v samples (zipper rows; the two Hermite halves of a tube swept along a spline: 105-sample loop, u-border rows differ) -> earcut chords + `refine_curved` capped at 2000 triangles -> 2 x 2001 triangles spanning the tube, area 140.9 vs Revit 13.01. (2) A twisted ruled loft side is ONE quad (4 border samples): 2 triangles for a hyperbolic paraboloid.
 Fix: `_col_grid` (zipper columns, union of the border u samples when the v-borders differ; border columns keep their own samples so shared edges still weld) and `_subdivide_grid` (1->4 midpoint split of grid triangles until interior edge midpoints are within tol, tol >= border chord error). Measured vs Revit gt_geom (2024 base files, ours / Revit): fam_sweep_spline_path area 12.99/13.01 vol 1.5766/1.5640; fam_blend_twist 38.593/38.593 vol 14.4388/14.4379; fam_blend_rect_circle 29.90/29.91 vol 11.1325/11.1385; fam_sweptblend now closed, area 8.77/8.73, vol 1.0700/1.0608 (+0.9%). Lighting Fixtures: the extra body 1000100000 is a stored mesh (nid >= 10**9), never counted as a solid (volume_by_node), reply posted to the viewer.
 Final rules (after regression check on 2024/2026 Facades, 2024 Site, 2020 Residential): `_col_grid` only for ruled/hermite faces, border samples never merged (union columns made T-junctions: revolution volumes -12%, Toposolid collapsed); `_subdivide_grid` only for single-quad ruled grids. RVT_NOCOLGRID=1 disables. Demo smoke test OK.
+
+
+## Parameter reproduction, FINAL #3, all 60 gt4 files (c3-geometry, 2026-10-17; pout_c26 on host1 = FINAL #2 rules + pipe Fixture Units, Start/End Join Cutback, referencing sheet/detail, duct fitting offsets, Location Mark, Invert Elevation; NOT the room heat-gain / Room Cavity Ratio forced edits made after 08:25)
+Overall 94.8% of 8.98M values reproduced (FINAL #2: 94.5%); every year at or above its FINAL #2 value (2020 95.3 / 2021 95.8 / 2022 95.7 / 2023 95.6 / 2024 93.9 / 2025 93.9 / 2026 92.8).
+```
+year files    values  before%  exact%  exact+approx%   Double / Integer / String / ElementId exact%   not reproduced: a_lookup b_geom c_mep d_other (% of values)
+2020    6   1068534     89.7    95.3     95.4        86.9 / 96.3 / 93.6 / 99.7     1.0 1.9 1.2 0.6
+2021    9   1426259     90.6    95.8     95.9        88.3 / 96.5 / 93.7 / 99.7     1.0 1.7 0.9 0.6
+2022    9   1438591     90.7    95.7     95.9        88.5 / 96.5 / 93.3 / 99.7     1.0 1.7 0.9 0.6
+2023    9   1529686     88.2    95.6     95.7        89.6 / 94.4 / 95.0 / 99.5     1.3 1.5 0.9 0.6
+2024    9   1294307     80.1    93.9     94.0        86.0 / 96.9 / 97.2 / 98.4     0.9 2.0 2.3 0.7
+2025    9   1105074     79.4    93.9     94.0        86.7 / 95.7 / 96.6 / 98.5     1.2 1.8 1.9 1.1
+2026    9   1113559     84.7    92.8     93.0        84.6 / 95.2 / 96.1 / 98.0     1.5 1.8 2.0 1.6
+ALL    60   8976010              94.8     94.9
+```

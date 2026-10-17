@@ -129,3 +129,19 @@ if __name__ == '__main__':
     import json
     mt = material_table(sys.argv[1]); print(len(mt), 'materials')
     for m in list(mt.values())[:3]: print(json.dumps(m, default=str)[:900])
+
+
+def fill_patterns(file):
+    """fill pattern definitions (FillPatternElem): {id: {'name', 'target' (0 drafting, 1 model), 'orientation', 'scale', 'window', 'grids': [{'angle' (rad), 'origin' (u, v ft), 'deltas' (shift along the line, spacing between lines, ft), 'segs' (dash/gap lengths, ft; [] = solid line)}]}}.
+    Units are feet at pattern scale 1 (drafting patterns are in paper feet, model patterns in model feet); 'solid fill' has no grids. Validated on 2020 Commercial (53 patterns, e.g. Brick: lines at 0 rad every 0.22225 ft + vertical joints every 0.3333 ft, name/target as in the dump)."""
+    out = {}
+    for eid, r in _ctx(file).recs.items():
+        if r['class'] != 'FillPatternElem': continue
+        fp = _ob(_ob(r['fields']).get('m_pFillPattern') or {})
+        if not isinstance(fp, dict): continue
+        grids = []
+        for g in fp.get('m_gridsArr') or []:
+            g = _ob(g)
+            if isinstance(g, dict): grids.append({'angle': float(g.get('m_angle', 0)), 'origin': [float(v) for v in g.get('m_origin') or (0, 0)], 'deltas': [float(v) for v in g.get('m_deltas') or (0, 0)], 'segs': [float(v) for v in g.get('m_segs') or []]})
+        out[eid] = {'id': eid, 'name': fp.get('m_name'), 'target': fp.get('m_fpTarget'), 'orientation': fp.get('m_fpOrientation'), 'scale': fp.get('m_scale'), 'window': fp.get('m_windowSize'), 'grids': grids}
+    return out
