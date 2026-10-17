@@ -549,8 +549,8 @@ def tessellate_geometry(geo):
             try: idx = earcut.triangulate_float64(arr, np.array(ring_ends, dtype=np.uint32))
             except Exception: unsup.append('earcut'); continue
             if kind != 'plane' and not os.environ.get('RVT_NOREFINE'):        # curved face: the emitted triangles must follow the surface (viewer request 10)
-                g_ = (_rect_grid(verts, ev) or (None if os.environ.get('RVT_NOCOLGRID') else _col_grid(verts, ev))) if len(ring_ends) == 1 else None      # _col_grid: zipper rows, long thin faces (sweep along a spline) used to fall to earcut chords + capped refinement (10x area)
-                if g_ is not None and kind in ('ruled', 'hermite') and not os.environ.get('RVT_NOCOLGRID'): g_ = _subdivide_grid(g_[0], g_[1], ev)        # twisted ruled / hermite faces: interior chords must follow the surface
+                g_ = (_rect_grid(verts, ev) or (_col_grid(verts, ev) if kind in ('ruled', 'hermite') and not os.environ.get('RVT_NOCOLGRID') else None)) if len(ring_ends) == 1 else None      # _col_grid: zipper rows, long thin faces (sweep along a spline) used to fall to earcut chords + capped refinement (10x area)
+                if g_ is not None and kind == 'ruled' and len(g_[1]) <= 2 and not os.environ.get('RVT_NOCOLGRID'): g_ = _subdivide_grid(g_[0], g_[1], ev)        # twisted ruled / hermite faces: interior chords must follow the surface
                 if g_ is None and os.environ.get('RVT_STRIP'): g_ = _strip_tri(verts, ring_ends, ev)      # experimental: adds points on loop edges (breaks shell welding)
                 if g_ is not None: verts, tl = g_
                 elif len(ring_ends) == 1: verts, tl = refine_curved(verts, idx, ev)
