@@ -162,7 +162,7 @@ def params(path, geom=None):
                 _setp(d, 'Leader Line', 'Integer', ld_)
         if c in ('RoomElem', 'SpaceElem'):                               # default people heat gains (internal units) of every room (1288 of 1288 in the corpus) and 98% of spaces
             for nm_, v_ in (('Latent Heat Gain per person', 630.91814901260966), ('Sensible Heat Gain per person', 788.6476862657621), ('Total Heat Gain per person', 1419.5658352783718)):
-                if not any(k_.split('|')[0] == nm_ for k_ in d): _setp(d, nm_, 'Double', v_)
+                if c == 'RoomElem' or not any(k_.split('|')[0] == nm_ for k_ in d): _setp(d, nm_, 'Double', v_)          # rooms always carry the default (the learned slot guess was wrong for 165 of 323 in rme_basic)
         if c in ('RoomElem', 'SpaceElem') and isinstance(f.get('m_dRoomCavityRatio'), float):       # lighting analysis value stored on the record (rme_basic 2020: 81 of 81 exact)
             _setp(d, 'Room Cavity Ratio', 'Double', f['m_dRoomCavityRatio'])
         elif c == 'AnalyticalMember':                                    # end releases: m_cellList cells with m_releaseType (start, end); fixed (0) = no moment released, otherwise start Mx/My/Mz = 0/1/1, end 1/1/1 (2023 rst_advanced: 393 + 4 + 203 members, all exact)
