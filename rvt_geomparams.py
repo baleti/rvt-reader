@@ -121,6 +121,16 @@ def geom_params(doc, eid, f, cat, cls='FamilyInstance'):
             else: out['Width'] = out['Height'] = 0.0
         return out
     out['Area'] = float(area) / 2
+    if cat == -2000023:                                    # doors whose type/instance lacks Width/Height (curtain-wall doors): the horizontal oriented extent of the body and its z extent are Revit's values (2020 Commercial 101A-D: 2.8959 x 8.0 exact)
+        T2 = np.array(m['tris'], float).reshape(-1, 3)
+        if len(T2):
+            tr2 = _trf(f)
+            if tr2 is not None:                                    # extent in the instance frame (x = door width): exact to 1e-5 ft; the PCA axis of the horizontal outline is the fallback
+                L2 = (T2 - tr2[1]) @ tr2[0]; out['Width'] = float(L2[:, 0].max() - L2[:, 0].min())
+            else:
+                c2 = T2[:, :2] - T2[:, :2].mean(0); vt = np.linalg.svd(c2, full_matrices=False)[2]; p2 = c2 @ vt.T
+                out['Width'] = float(p2[:, 0].max() - p2[:, 0].min())
+            out['Height'] = float(T2[:, 2].max() - T2[:, 2].min())
     if cat == -2008010: out.pop('Area', None)          # duct fittings: Revit's Area is not half the surface (0 of 311 right in rme_basic 2020; pipe fittings 119 of 119); better absent than wrong
     if cat == CAT_MULLION:
         tr = _trf(f)

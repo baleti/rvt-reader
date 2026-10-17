@@ -269,6 +269,7 @@ def params(path, geom=None):
             if 'Width' in o['params'] and 'Height' in o['params']: exact |= {'Width', 'Height', 'Area'}      # curtain panel cell from its symbol (exact)
             if o['params'].get('Volume') == 0.0: exact.add('Volume')                                      # wall-type curtain panel
             for k, v in gp.items():
+                if k in ('Width', 'Height') and cat == -2000023 and o['params'].get(k) not in (None, 0, 0.0): continue       # door sizes from the mesh only when the type gives none
                 if k not in exact: o['params'][k] = v
     # analytical members take the physical member's Length (FamilyInstance.m_oFamInstUserData.m_analyticalModelId)
     for eid, o in list(out.items()):

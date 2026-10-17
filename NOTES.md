@@ -1053,3 +1053,7 @@ year files    values  before%  exact%  exact+approx%   Double / Integer / String
 2026    9   1113559     84.7    92.8     93.0        84.6 / 95.2 / 96.1 / 98.0     1.5 1.8 2.0 1.6
 ALL    60   8976010              94.8     94.9
 ```
+
+Validation of the room heat-gain constants + Room Cavity Ratio edits (c3-geometry, 2026-10-17, pout_c28 = same rules as pout_c26 + those edits; 2020 Residential, rst_basic, rme_basic): exact 95.4% -> 95.5% (Double 87.2 -> 87.6), no class got worse; the edits are kept. A full run #4 would add them to the FINAL #3 table (expected +0.1% on the 2020 group).
+
+Door Width/Height from the body (c3-geometry, 2026-10-17; pout_c29 = c26 + rule, 2020 Commercial/Residential + 2023 Arch Link): exact 96.0% -> 96.1% on the 3 files, no regression; Commercial curtain-wall doors 101A-D Height exact, Width approx (PCA axis, 4.5e-5 ft) -> now measured in the instance frame (2.89583 exact in a probe on 191870/191872/191880; not re-run through the params pipeline).
