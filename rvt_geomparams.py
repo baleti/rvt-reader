@@ -43,6 +43,11 @@ def _drop_form_nodes(doc, eid, m, detail):
         return {k: ([v[i] for i in keep] if isinstance(v, list) and len(v) == len(m['nid']) else v) for k, v in m.items()}
     except Exception: return m
 
+def apply_form_node_rule(doc, eid, m, cat, detail):
+    """public helper for renderers: drop the symbol solids Revit does not count (see _drop_form_nodes) from an element_mesh result `m` when the element's category (signed id) is one the rule was validated on (electrical / lighting categories); returns m unchanged otherwise"""
+    if m is not None and m.get('source') == 'symbol_instance' and cat in _FORM_NODE_CATS: return _drop_form_nodes(doc, eid, m, detail)
+    return m
+
 def volume_detail(doc):
     """detail level of Revit's computed Volume/Area for this file (2 = Medium up to Revit 2025, 3 = Fine from 2026)"""
     if getattr(doc, '_vdetail', None) is None:

@@ -949,3 +949,87 @@ SWall                  2017:99/0/1(n437) 2018:99/0/1(n437) 2019:99/0/1(n437)
 RoomElem               2017:99/1/0(n326) 2018:99/1/0(n326) 2019:99/1/0(n326)
 RbsFlexDuctCurve  
 ```
+
+## Parameter reproduction, FINAL #2, all 60 gt4 files (c5-geometry, 2026-10-17; pout_c22 on host1 = rules from the TRAIN split, geometry-derived values on; before = pout_c2g; supersedes the 94.1% table)
+ALL 94.5% exact (86.5% before, 94.1% in pout_c9): 2020 95.2, 2021 95.7, 2022 95.7, 2023 95.5, 2024 93.2, 2025 93.2, 2026 92.1; no file below its pout_c9 value. Added since pout_c9: structural Elevation at Top/Bottom (reference level, z offset, justification, section depth), AnalyticalMember releases, hub / reference point Connection Status (enum 2 in 2020-22, 1 in 2023) and Associated Level (nearest level), Location Mark and Column Location Mark (grid names + mm offsets), pipe Invert Elevation, duct fitting Offset Width/Height, tag Leader Line, Referencing Sheet/Detail. Round duct fitting offsets (Diameter/2) were already in the later files of this run (validated: rme_basic 2020 Offset Width 308 of 473 ok).
+```
+year files    values  before%  exact%  exact+approx%   Double / Integer / String / ElementId exact%   not reproduced: a_lookup b_geom c_mep d_other (% of values)
+2020    6   1068534     89.7    95.2     95.3        86.6 / 96.3 / 93.6 / 99.7     1.0 1.9 1.2 0.6
+2021    9   1426259     90.6    95.7     95.8        88.0 / 96.5 / 93.7 / 99.7     1.0 1.7 0.9 0.6
+2022    9   1438591     90.7    95.7     95.8        88.2 / 96.5 / 93.3 / 99.7     1.0 1.7 0.9 0.6
+2023    9   1529686     88.2    95.5     95.6        89.2 / 94.4 / 95.0 / 99.5     1.3 1.5 0.9 0.7
+2024    9   1294307     80.1    93.2     93.4        84.1 / 96.9 / 97.2 / 98.4     0.9 2.1 2.3 1.2
+2025    9   1105074     79.4    93.2     93.3        84.6 / 95.7 / 96.6 / 98.5     1.2 1.9 1.9 1.6
+2026    9   1113559     84.7    92.1     92.3        82.5 / 95.2 / 96.1 / 98.0     1.5 2.0 2.0 2.2
+ALL    60   8976010              94.5     94.6
+== a_lookup_candidate 100987
+     3880 Leader Line [Integer]
+     3610 Family and Type [String]
+     3354 Connection Status [Integer]
+     2914 Sheet Number [String]
+     2731 Has Association [Integer]
+     2486 Referencing Sheet [String]
+     2476 Occupancy Unit [Integer]
+     2472 Ways [Integer]
+     2374 Export to IFC [Integer]
+     2313 Referencing Detail [String]
+     1946 Family [String]
+     1834 Host [String]
+     1699 Moves With Grids [Integer]
+     1517 Far Clipping [Integer]
+     1470 Rebar Number [String]
+     1438 Sheet Name [String]
+     1419 Type [ElementId]
+     1403 Associated Level [String]
+     1368 Structural Material [ElementId]
+     1291 Detail Number [String]
+     1248 y Justification [Integer]
+     1233 Family [ElementId]
+     1182 Category [ElementId]
+     1124 Type Id [ElementId]
+     1124 Family and Type [ElementId]
+== b_geom 164049
+    46158 Area [Double]
+    37536 Volume [Double]
+     6951 Length [Double]
+     6116 Cut Length [Double]
+     4928 Slope [Double]
+     4088 End Join Cutback [Double]
+     3961 Elevation from Level [Double]
+     3876 OffsetHeight [Double]
+     3778 Elevation at Top [Double]
+     3596 OffsetWidth [Double]
+     3333 Perimeter [Double]
+     3065 Elevation at Bottom [Double]
+     2875 Unconnected Height [Double]
+     2669 Start Join Cutback [Double]
+     2476 Area per Person [Double]
+     2336 Takeoff Length Projection [Double]
+     2316 Cross-Section Rotation [Double]
+     1904 Width [Double]
+     1703 Elevation at Top Survey [Double]
+     1703 Elevation at Bottom Survey [Double]
+     1659 Height [Double]
+     1361 Invert Elevation [Double]
+     1149 Total Bar Length [Double]
+     1071 Angle [Double]
+      953 Display Elevations [Integer]
+== c_mep 124439
+    30169 Pressure Drop [Double]
+    13361 Velocity Pressure [Double]
+    12686 System Type [ElementId]
+    11121 Flow [Double]
+    10180 Friction [Double]
+    10180 Velocity [Double]
+     9270 System Classification [String]
+     5880 Loss Coefficient [Double]
+     4107 Section [Integer]
+     3246 Relative Roughness [Double]
+     2348 Circuit Description [String]
+     2204 Additional Flow [Double]
+     1930 Electrical Data [String]
+     1627 Friction Factor [Double]
+     1016 System Length [Double]
+      744 Static Pressure [Double]
+      462 Reynolds numb
+```
