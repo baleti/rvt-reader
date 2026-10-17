@@ -391,6 +391,15 @@ def params(path, geom=None):
         wt_ = p_.get('Wall Thickness') if isinstance(p_.get('Wall Thickness'), float) else 0.0
         vert_ = abs((top_ - bot_) - od_) > 1e-6 and (top_ - bot_) > 1.5 * od_
         _setp(p_, 'Invert Elevation', 'Double', lv[rl_] + bot_ + (0.0 if vert_ else wt_))
+    # pipes: Fixture Units = the demand stored in the pipe's own connector modifiers (m_dDemand; 88 of 88 sanitary pipes exact on rme_basic 2020); other pipes carry 0 and Revit reports none
+    for e_, o_ in out.items():
+        if o_['class'] != 'RbsPipeCurve': continue
+        dem_ = []
+        for cn_ in (((recs[e_]['fields'].get('m_pConnectorManager') or {}).get('obj') or {}).get('m_connPtrArray') or []):
+            for m_ in ((cn_.get('obj') or {}).get('m_modifiers') or []) if isinstance(cn_, dict) else []:
+                mo_ = (m_.get('obj') or {}) if isinstance(m_, dict) else {}
+                if isinstance(mo_.get('m_dDemand'), float): dem_.append(mo_['m_dDemand'])
+        if dem_ and (max(dem_) > 0 or o_['params'].get('System Classification') == 'Sanitary'): _setp(o_['params'], 'Fixture Units', 'Double', max(dem_))
     # MEP system sections: a system (RbsHvacSystem / RbsPipingSystem) lists its members per section (m_rgSections[].m_rgSection[].m_id); the member's Section is the section it belongs to
     # (an element shared by several sections: the section where it is the second end, else the first end; measured 1020 of 1036 on rme_basic) and its System Name the system's m_strName
     sec_ = collections.defaultdict(list)
@@ -421,7 +430,7 @@ def params(path, geom=None):
             for k_, v_ in out[ow]['params'].items():
                 if k_.split('|')[0] in INH: o_['params'][k_] = v_
             for k_, v_ in out[ow]['params'].items():
-                if (' End ' in k_ and 'Elevation' in k_) or k_.split('|')[0] in ('Area', 'Wall Thickness', 'Top Elevation', 'Bottom Elevation', 'Middle Elevation', 'Invert Elevation'): o_['params'].setdefault(k_, v_)
+                if (' End ' in k_ and 'Elevation' in k_) or k_.split('|')[0] in ('Area', 'Wall Thickness', 'Top Elevation', 'Bottom Elevation', 'Middle Elevation', 'Invert Elevation', 'Fixture Units'): o_['params'].setdefault(k_, v_)
     # OmniClass Title follows from the OmniClass Number (standard table; omniclass_titles.json holds the 73 numbers seen in the corpus, one title each)
     try: _OT = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'omniclass_titles.json')))
     except Exception: _OT = {}
