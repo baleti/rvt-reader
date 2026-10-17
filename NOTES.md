@@ -1033,3 +1033,7 @@ ALL    60   8976010              94.5     94.6
       744 Static Pressure [Double]
       462 Reynolds numb
 ```
+
+## 2026-10-17 (c3-geometry): spline sweeps, twisted lofts, blends (viewer item 23)
+Causes (reader, rvt_mesh.tessellate_geometry): (1) `_rect_grid` returned None when the two u-borders of a rectangle loop carry different v samples (zipper rows; the two Hermite halves of a tube swept along a spline: 105-sample loop, u-border rows differ) -> earcut chords + `refine_curved` capped at 2000 triangles -> 2 x 2001 triangles spanning the tube, area 140.9 vs Revit 13.01. (2) A twisted ruled loft side is ONE quad (4 border samples): 2 triangles for a hyperbolic paraboloid.
+Fix: `_col_grid` (zipper columns, union of the border u samples when the v-borders differ; border columns keep their own samples so shared edges still weld) and `_subdivide_grid` (1->4 midpoint split of grid triangles until interior edge midpoints are within tol, tol >= border chord error). Measured vs Revit gt_geom (2024 base files, ours / Revit): fam_sweep_spline_path area 12.99/13.01 vol 1.5766/1.5640; fam_blend_twist 38.593/38.593 vol 14.4388/14.4379; fam_blend_rect_circle 29.90/29.91 vol 11.1325/11.1385; fam_sweptblend now closed, area 8.77/8.73, vol 1.0700/1.0608 (+0.9%). Lighting Fixtures: the extra body 1000100000 is a stored mesh (nid >= 10**9), never counted as a solid (volume_by_node), reply posted to the viewer.

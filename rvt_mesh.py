@@ -549,7 +549,8 @@ def tessellate_geometry(geo):
             try: idx = earcut.triangulate_float64(arr, np.array(ring_ends, dtype=np.uint32))
             except Exception: unsup.append('earcut'); continue
             if kind != 'plane' and not os.environ.get('RVT_NOREFINE'):        # curved face: the emitted triangles must follow the surface (viewer request 10)
-                g_ = _rect_grid(verts, ev) if len(ring_ends) == 1 else None
+                g_ = (_rect_grid(verts, ev) or (None if os.environ.get('RVT_NOCOLGRID') else _col_grid(verts, ev))) if len(ring_ends) == 1 else None      # _col_grid: zipper rows, long thin faces (sweep along a spline) used to fall to earcut chords + capped refinement (10x area)
+                if g_ is not None and kind in ('ruled', 'hermite') and not os.environ.get('RVT_NOCOLGRID'): g_ = _subdivide_grid(g_[0], g_[1], ev)        # twisted ruled / hermite faces: interior chords must follow the surface
                 if g_ is None and os.environ.get('RVT_STRIP'): g_ = _strip_tri(verts, ring_ends, ev)      # experimental: adds points on loop edges (breaks shell welding)
                 if g_ is not None: verts, tl = g_
                 elif len(ring_ends) == 1: verts, tl = refine_curved(verts, idx, ev)
@@ -580,7 +581,7 @@ def _rect_grid(verts, ev, max_n=48):
         return out
     A0, A1, Vs = thin(sorted(ub0)), thin(sorted(ub1)), thin(Vs)
     nv = len(Vs) - 1
-    if nv < 1 or nv > max_n or len(A0) - 1 > 4 * max_n or len(A1) - 1 > 4 * max_n: return None
+    if nv < 1 or nv > max_n or len(A0) - 1 > 4 * max_n or len(A1) - 1 > 4 * max_n or nv * (len(A0) + len(A1)) > 60000: return None
     sgn = 1 if _area2([tuple(q) for q in verts]) > 0 else -1           # keep the loop's winding
     V = []; rows = []
     for jj, vv in enumerate(Vs):                                      # bottom half of the rows carries the v0-border samples, top half the v1-border samples
@@ -594,6 +595,74 @@ def _rect_grid(verts, ev, max_n=48):
             adv0 = i1 >= len(r1) - 1 or (i0 < len(r0) - 1 and V[r0[i0 + 1]][0] <= V[r1[i1 + 1]][0])
             if adv0: t = (r0[i0], r0[i0 + 1], r1[i1]); i0 += 1
             else: t = (r0[i0], r1[i1 + 1], r1[i1]); i1 += 1
+            T.append(t if sgn > 0 else (t[0], t[2], t[1]))
+    P = [np.asarray(ev(*q), float) for q in V]
+    T = [t for t in T if min(np.linalg.norm(P[t[0]] - P[t[1]]), np.linalg.norm(P[t[1]] - P[t[2]]), np.linalg.norm(P[t[0]] - P[t[2]])) > 1e-9]
+    return V, T
+
+def _subdivide_grid(V, T, ev, rel_tol=float(os.environ.get("RVT_REFINE_REL", 5e-3)), abs_tol=0.0033, max_tris=6000, max_depth=5):
+    """structured-grid triangles of a doubly curved face (twisted ruled loft sides, hermite patches) whose interior chords miss the surface by more than the
+    boundary samples do: 1->4 midpoint split (shared edge midpoints, winding kept) until the interior edge midpoints are within tol. Border edges are split
+    too (the new vertices are collinear for straight borders, so no visible crack). Returns (V, T)."""
+    V = [tuple(map(float, q)) for q in V]; T = [tuple(t) for t in T]
+    if not T: return V, T
+    P = [np.asarray(ev(*q), float) for q in V]
+    A = np.array(P); tol = max(abs_tol, rel_tol * float(np.linalg.norm(A.max(0) - A.min(0))))
+    def edges_of(T_):
+        em = collections.Counter()
+        for t in T_:
+            for k in range(3): em[frozenset((t[k], t[(k + 1) % 3]))] += 1
+        return em
+    def dev(i, j):
+        m = ((V[i][0] + V[j][0]) / 2, (V[i][1] + V[j][1]) / 2)
+        return float(np.linalg.norm(np.asarray(ev(*m), float) - (P[i] + P[j]) / 2))
+    em = edges_of(T); bdev = max([dev(*tuple(e)) for e, c in em.items() if c == 1] or [0.0]); tol = max(tol, bdev)
+    for _ in range(max_depth):
+        em = edges_of(T)
+        if len(T) * 4 > max_tris: break
+        if max(dev(*tuple(e)) for e, c in em.items() if c == 2) <= tol if any(c == 2 for c in em.values()) else True: break
+        mid = {}
+        def mp(i, j):
+            k = frozenset((i, j))
+            if k not in mid:
+                m = ((V[i][0] + V[j][0]) / 2, (V[i][1] + V[j][1]) / 2); V.append(m); P.append(np.asarray(ev(*m), float)); mid[k] = len(V) - 1
+            return mid[k]
+        nT = []
+        for a, b, c in T:
+            ab, bc, ca = mp(a, b), mp(b, c), mp(c, a)
+            nT += [(a, ab, ca), (ab, b, bc), (ca, bc, c), (ab, bc, ca)]
+        T = nT
+    return V, T
+
+def _col_grid(verts, ev, max_rows=1500):
+    """_rect_grid for a rectangle loop whose two u-borders carry DIFFERENT v samples (zipper rows; e.g. the two halves of a tube swept along a spline: the
+    welded border edges come from different curves): columns at the u samples shared by both v-borders, border columns keep their own v samples (welds),
+    interior columns the union of both; consecutive columns are zipped. None when the v-borders differ or the loop is not the full rectangle."""
+    U = np.array(verts, float); u0, v0 = U.min(0); u1, v1 = U.max(0)
+    if u1 - u0 < 1e-9 or v1 - v0 < 1e-9: return None
+    tb = 1e-6 * max(1.0, abs(u1 - u0), abs(v1 - v0))
+    onb = (np.abs(U[:, 0] - u0) < tb) | (np.abs(U[:, 0] - u1) < tb) | (np.abs(U[:, 1] - v0) < tb) | (np.abs(U[:, 1] - v1) < tb)
+    if not onb.all() or abs(abs(_area2([tuple(q) for q in verts])) - (u1 - u0) * (v1 - v0)) > 1e-6 * (u1 - u0) * (v1 - v0) + 1e-12: return None
+    A0_ = sorted({round(q[0], 8) for q in U if abs(q[1] - v0) < tb} | {round(u0, 8), round(u1, 8)}); A1 = sorted({round(q[0], 8) for q in U if abs(q[1] - v1) < tb} | {round(u0, 8), round(u1, 8)})
+    if A0_ != A1: return None                                          # a union of the v-border samples would leave T-junctions: the closed-shell / volume selection needs welded borders
+    A0 = A0_
+    L = sorted({round(q[1], 8) for q in U if abs(q[0] - u0) < tb} | {round(v0, 8), round(v1, 8)}); R = sorted({round(q[1], 8) for q in U if abs(q[0] - u1) < tb} | {round(v0, 8), round(v1, 8)})
+    mid = []
+    for x in sorted(set(L) | set(R)):
+        if not mid or x - mid[-1] > 1e-9: mid.append(x)
+    if len(mid) > max_rows or len(A0) * len(mid) > 20000: return None
+    cols = [L] + [mid] * (len(A0) - 2) + [R]
+    sgn = 1 if _area2([tuple(q) for q in verts]) > 0 else -1
+    V = []; ids = []
+    for u, rows in zip(A0, cols):
+        ids.append([len(V) + k for k in range(len(rows))]); V += [(u, vv) for vv in rows]
+    T = []
+    for k in range(len(A0) - 1):
+        a, b = ids[k], ids[k + 1]; i = j = 0
+        while i < len(a) - 1 or j < len(b) - 1:
+            advl = j >= len(b) - 1 or (i < len(a) - 1 and V[a[i + 1]][1] <= V[b[j + 1]][1])
+            if advl: t = (a[i], b[j], a[i + 1]); i += 1
+            else: t = (a[i], b[j], b[j + 1]); j += 1
             T.append(t if sgn > 0 else (t[0], t[2], t[1]))
     P = [np.asarray(ev(*q), float) for q in V]
     T = [t for t in T if min(np.linalg.norm(P[t[0]] - P[t[1]]), np.linalg.norm(P[t[1]] - P[t[2]]), np.linalg.norm(P[t[0]] - P[t[2]])) > 1e-9]
