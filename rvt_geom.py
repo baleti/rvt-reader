@@ -76,11 +76,18 @@ def mep_curve(f, cls, lvl=None):
             out['_end_k'] = k; out['_end_R'] = Ro
         if is_line(cu) and L:
             hz = L * math.sqrt(max(0.0, 1 - cu['m_dirVec'][2] ** 2) / sum(a * a for a in cu['m_dirVec']))
-            out['Slope'] = (e - s) / hz if hz > 1e-9 else 0.0
+            out['Slope'] = (s - e) / hz if hz > 1e-9 else 0.0          # Revit: positive when the run DESCENDS from its start (rme_basic 2020 528249: start 7.871, end 7.642, Slope +0.01)
+    for k_, nm_ in (('m_dFlow', 'Flow'), ('m_dAdditionalFlow', 'Additional Flow'), ('m_dVelocity', 'Velocity'), ('m_dFriction', 'Friction'), ('m_dPressureDrop', 'Pressure Drop'), ('m_dVelocityPressure', 'Velocity Pressure'),
+                    ('m_dLossCoefficient', 'Loss Coefficient'), ('m_dHydraulicDiameter', 'Hydraulic Diameter'), ('m_dEqDiameter', 'Equivalent Diameter'), ('m_dReynoldsNumber', 'Reynolds Number')):          # the engine results Revit stored on the run (rme_basic 2020 536476: Flow 3.5315, Friction .021582, Pressure Drop .049566 identical to Revit's parameters)
+        if isinstance(dpm.get(k_), float): out[nm_] = dpm[k_]
+    st_ = dpm.get('m_idSystemType')
+    if st_ is not None and int(st_) not in (0xFFFFFFFF, 0xFFFFFFFFFFFFFFFF): out['System Type'] = int(st_)          # the run's system type element (Snowdon HVAC 1365662: 712041; the symbol type id 139186 was wrong)
     if cls == 'RbsPipeCurve' and w is not None and L is not None: out['Area'] = math.pi * w * L
+    rnd_ = cls == 'RbsDuctCurve' and '\u00f8' in str(dpm.get('m_sOverallSize') or '')          # round duct: its size string is '250 mmø'
     if cls == 'RbsDuctCurve' and w is not None and h is not None and L is not None:
-        out['Area'] = 2 * (w + h) * L if abs(w - h) > 0 or True else math.pi * w * L
-    if cls in ('RbsDuctCurve', 'CableTray'):
+        out['Area'] = math.pi * w * L if rnd_ else 2 * (w + h) * L          # round: pi d L (rme_basic 2020 536476: 5.9178), rectangular: perimeter x length
+    if rnd_ and w is not None: out['Diameter'] = w
+    if cls in ('RbsDuctCurve', 'CableTray') and not rnd_:
         if w is not None: out['Width'] = w
         if h is not None: out['Height'] = h
     if cls in ('RbsPipeCurve',) and w is not None: out['Diameter'] = w
