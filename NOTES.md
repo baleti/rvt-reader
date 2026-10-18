@@ -1059,3 +1059,18 @@ Validation of the room heat-gain constants + Room Cavity Ratio edits (c3-geometr
 Door Width/Height from the body (c3-geometry, 2026-10-17; pout_c29 = c26 + rule, 2020 Commercial/Residential + 2023 Arch Link): exact 96.0% -> 96.1% on the 3 files, no regression; Commercial curtain-wall doors 101A-D Height exact, Width approx (PCA axis, 4.5e-5 ft) -> now measured in the instance frame (2.89583 exact in a probe on 191870/191872/191880; not re-run through the params pipeline).
 
 Residual review (c3-geometry, 2026-10-18, from fidfull9): (1) Plumbing 2024 FamilyInstance: 398 of 400 elements within 2% volume (2 outliers: a 0.0020 ft3 part -5.5%, element 1389546 -3.2%), the old "pipe fittings ~4% low" is no longer visible. (2) Text3dElem 13 elements: IoU 0.941-0.987 against Revit's stored element bbox (2 below 0.95 only because Revit's BB for model text is not the glyph hull); the oracle solid of the Commercial 'Pharmacy' signs matches exactly (volume 38.1535, area 229.803, 564 faces), so the 76.9% line is a bbox artefact, not a geometry error. (3) Toposolid 2026 Site 1264746 (10.6M ft3): mesh is open (582 boundary edges among 4,700 small planar side faces), volume -2.3%; the 2025 version is closed at -0.8%. Single element, documented residual.
+
+
+## Parameter reproduction, FINAL #4, all 60 gt4 files (c3-geometry, 2026-10-18; pout_c30 on host1 = FINAL #3 + room heat-gain constants / Room Cavity Ratio + door Width/Height from the body + the 2026-10-17 mesh changes)
+Overall 94.9% of 8.98M values exact (FINAL #3 94.8%, FINAL #2 94.5%); per year 2020 95.4 / 2021 95.9 / 2022 95.8 / 2023 95.7 / 2024 93.9 / 2025 93.9 / 2026 92.8, none below FINAL #3.
+```
+year files    values  before%  exact%  exact+approx%   Double / Integer / String / ElementId exact%   not reproduced: a_lookup b_geom c_mep d_other (% of values)
+2020    6   1068534     89.7    95.4     95.5        87.3 / 96.3 / 93.6 / 99.7     1.0 1.8 1.2 0.5
+2021    9   1426259     90.6    95.9     96.0        88.6 / 96.5 / 93.7 / 99.7     1.0 1.7 0.9 0.5
+2022    9   1438591     90.7    95.8     95.9        88.8 / 96.5 / 93.3 / 99.7     1.0 1.7 0.9 0.5
+2023    9   1529686     88.2    95.7     95.8        89.8 / 94.4 / 95.0 / 99.5     1.3 1.5 0.9 0.6
+2024    9   1294307     80.1    93.9     94.0        86.0 / 96.9 / 97.2 / 98.4     0.9 2.0 2.3 0.7
+2025    9   1105074     79.4    93.9     94.0        86.7 / 95.7 / 96.6 / 98.5     1.2 1.8 1.9 1.1
+2026    9   1113559     84.7    92.8     93.0        84.6 / 95.2 / 96.1 / 98.0     1.5 1.8 2.0 1.6
+ALL    60   8976010              94.9     95.0
+```
