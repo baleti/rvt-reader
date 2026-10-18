@@ -151,15 +151,43 @@ def params(path, geom=None):
                 z_, e_ = min((abs(z_ - o_[2]), (z_, e_)) for e_, z_ in lv.items())[1]          # the NEAREST level (2023 rst_advanced: 471 on-level + 28 points below a level)
                 _setp(d, 'Associated Level', 'ElementId', int(e_)); _setp(d, 'Associated Level Offset', 'Double', o_[2] - z_)
         elif c == 'IndependentTag':                                      # Leader Line: a tagged entity with a non-zero elbow / end offset has a leader (2024 Snowdon Structural samples: offsets 0 -> 0, elbow offset set -> 1)
-            te_ = ((f.get('m_taggedEntitiesCell') or {}).get('obj') or {}).get('m_taggedEntities')
+            tc_ = f.get('m_taggedEntitiesCell') or {}; inl_ = 'obj' not in tc_; tc_ = tc_.get('obj') or tc_        # 2024+ stores the cell inline (no handle / obj wrapper)
+            te_ = tc_.get('m_taggedEntities')
+            if not te_:                                                       # 2025+: the cell list carries m_references (same offsets) and the leader end condition
+                for c_ in (((f.get('m_cellList') or {}).get('obj') or {}).get('m_cells') or []):
+                    co_ = (c_.get('obj') if isinstance(c_, dict) else None) or {}
+                    if isinstance(co_.get('m_references'), list): te_ = co_['m_references']; tc_ = co_; inl_ = True; break
             if isinstance(te_, list) and te_:
                 ld_ = 0
                 for t_ in te_:
-                    o_ = (t_.get('obj') if isinstance(t_, dict) else None) or {}
+                    o_ = (t_.get('obj') or t_) if isinstance(t_, dict) else {}
                     for k_ in ('m_elbowOffset', 'm_endOffset'):
                         xyz_ = (o_.get(k_) or {}).get('m_xyz')
                         if isinstance(xyz_, list) and any(isinstance(v_, float) and abs(v_) > 1e-9 for v_ in xyz_): ld_ = 1
-                _setp(d, 'Leader Line', 'Integer', ld_)
+                if not (inl_ and any(k_.split('|')[0] == 'Leader Line' for k_ in d)): _setp(d, 'Leader Line', 'Integer', ld_)          # stored parameter value wins (2024 Snowdon: 88 tags exact from the slot, offsets disagree); the offsets fill files without one (2025 Snowdon, 3880 values)
+        if c == 'IndependentTag':                                        # Leader Type = m_taggedEntitiesCell.m_leaderEndCondition (1063 of 1063, 2024 Snowdon Electrical)
+            tc2_ = f.get('m_taggedEntitiesCell') or {}; tc2_ = tc2_.get('obj') or tc2_
+            if not tc2_:
+                for c_ in (((f.get('m_cellList') or {}).get('obj') or {}).get('m_cells') or []):
+                    co_ = (c_.get('obj') if isinstance(c_, dict) else None) or {}
+                    if 'm_leaderEndCondition' in co_: tc2_ = co_; break
+            if isinstance(tc2_.get('m_leaderEndCondition'), int): _setp(d, 'Leader Type', 'Integer', tc2_['m_leaderEndCondition'])
+        for cl_ in (((f.get('m_cellList') or {}).get('obj') or {}).get('m_cells') or []):          # cell payloads keyed by field name, not by position
+            co_ = (cl_.get('obj') if isinstance(cl_, dict) else None) or {}
+            if c == 'FamilyInstance' and isinstance(co_.get('m_enableAnalyticalModel'), int): _setp(d, 'Enable Analytical Model', 'Integer', co_['m_enableAnalyticalModel'])    # 415 of 415 (2020 rst_basic)
+            if c == 'ElementGroup' and isinstance(co_.get('m_groupId'), int) and co_['m_groupId'] < 1 << 62:                    # the group type id shows as Type / Type Id / Family / Family and Type (65 of 65, 2024 Facades)
+                for nm_ in ('Type', 'Type Id', 'Family', 'Family and Type'): _setp(d, nm_, 'ElementId', co_['m_groupId'])
+        if c == 'SpotElevation':                                         # Leader: a spot elevation with a zero leader-segment offset has no leader (315 of 315, 2024 Structural)
+            segs_ = f.get('m_ArrSegInfo')
+            if isinstance(segs_, list) and segs_:
+                nz_ = 0
+                for sg_ in segs_:
+                    off_ = ((((sg_ or {}).get('m_oOffset2') or {}).get('obj') or {}).get('m_offset')) if isinstance(sg_, dict) else None
+                    if isinstance(off_, list) and any(isinstance(v_, float) and abs(v_) > 1e-9 for v_ in off_): nz_ = 1
+                _setp(d, 'Leader', 'Integer', nz_)
+        if c == 'RoomElem':                                              # Room Name / Room Number repeat the built-in Name / Number (stored by id -1006900 / -1006901 in the string parameter set; rme_basic 2020: 87 of 87 missing)
+            for nm_, src_ in (('Room Name', 'Name'), ('Room Number', 'Number')):
+                if not any(k_.split('|')[0] == nm_ for k_ in d) and isinstance(d.get(src_), str): _setp(d, nm_, 'String', d[src_])
         if c in ('RoomElem', 'SpaceElem'):                               # default people heat gains (internal units) of every room (1288 of 1288 in the corpus) and 98% of spaces
             for nm_, v_ in (('Latent Heat Gain per person', 630.91814901260966), ('Sensible Heat Gain per person', 788.6476862657621), ('Total Heat Gain per person', 1419.5658352783718)):
                 if c == 'RoomElem' or not any(k_.split('|')[0] == nm_ for k_ in d): _setp(d, nm_, 'Double', v_)          # rooms always carry the default (the learned slot guess was wrong for 165 of 323 in rme_basic)
@@ -251,6 +279,7 @@ def params(path, geom=None):
             if d.get('Category|ElementId') in (-2000023, -2000014):          # door / window types: Rough Width / Height absent = 0 (765 of 901 corpus values)
                 for nm_ in ('Rough Width', 'Rough Height'):
                     if not any(k_.split('|')[0] == nm_ and '|Double' in k_ for k_ in d) and not isinstance(d.get(nm_), float): _setp(d, nm_, 'Double', 0.0)
+        for k_ in [k_ for k_, v_ in d.items() if isinstance(v_, int) and not isinstance(v_, bool) and v_ == 0xFFFFFFFF]: d[k_] = -1          # an int parameter never holds uint32 max: it is the -1 'none' sentinel (RoomElem Occupancy Unit, 1812 values)
         out[eid] = {'class': c, 'params': d}
     if geom:
         import rvt_elemmesh as EM, rvt_geomparams as GP
@@ -570,11 +599,15 @@ def _view_sheet_params(out, recs):
                 if nm in ('Detail Number', 'Sheet Number', 'Sheet Name'): _setp(d, nm, 'String', v)
             if o['class'].startswith('DBView') and eid not in sheets and eid not in info:     # not placed on a sheet
                 _setp(d, 'Sheet Number', 'String', '---'); _setp(d, 'Detail Number', 'String', '-')
+            elif o['class'].startswith('DBView') and eid not in sheets and not any(k_.split('|')[0] == 'Sheet Number' for k_ in d):     # a viewport whose sheet did not resolve: Revit still reports no sheet
+                _setp(d, 'Sheet Number', 'String', '---')
         vw = f.get('m_dbViewId')
         if o['class'] in ('Viewer', 'Viewer3d', 'Section', 'InteriorElevArrow', 'InteriorElev', 'Callout', 'Elevation') and vw is not None and int(vw) in recs:
             vw = int(vw); r = info.get(vw)
             if vw in sheets: r = {'Sheet Number': pv(vw, 'Sheet Number'), 'Detail Number': '-'}       # the marker of a sheet itself
             _setp(d, 'Sheet Number', 'String', (r or {}).get('Sheet Number', '---')); _setp(d, 'Detail Number', 'String', (r or {}).get('Detail Number', '-'))
+            if isinstance(pv(vw, 'Associated Level'), str): _setp(d, 'Associated Level', 'String', pv(vw, 'Associated Level'))          # a marker shows its target view's level (rme_basic 2020: 52 of 52 missing)
+            _setp(d, 'Sheet Name', 'String', (r or {}).get('Sheet Name', '---'))          # unplaced view: '---' (Snowdon Electrical 2025 3650); placed: the sheet's name
             sc = scale(recs[vw]['fields'])
             if sc: _setp(d, 'View Scale', 'Integer', sc); _setp(d, 'Scale Value    1:', 'Integer', sc)
             # referencing view / sheet: a marker drawn in a view that is placed on a sheet references its target view from that sheet and detail number

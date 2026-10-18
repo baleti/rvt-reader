@@ -135,7 +135,21 @@ def wall(ctx, eid, rec):
     z0 = base_lv + bo
     flags = ['no_joins', 'no_openings']
     if seg['type'] == 'arc': flags.append('curved')
-    return _res(ctx, eid, rec, 'approx', [{'kind': 'wall_extrusion', 'location_curve': seg, 'thickness': w, 'height': H, 'base_z': z0, 'layers': layers, 'location_line': 'centre', 'voids': []}], flags)
+    return _res(ctx, eid, rec, 'approx', [{'kind': 'wall_extrusion', 'location_curve': seg, 'thickness': w, 'height': H, 'base_z': z0, 'layers': layers, 'location_line': 'centre', 'voids': []}], flags, bbox=_wall_bbox(seg, w, z0, H))
+
+def _wall_bbox(seg, w, z0, H):
+    # world bbox of the analytic wall prism (centre line offset by half the thickness on both sides; arcs sampled through their 3 points, then widened by the half thickness)
+    try:
+        p0, p1 = seg['p0'], seg['p1']; xs = [p0[0], p1[0]]; ys = [p0[1], p1[1]]
+        if seg['type'] == 'arc': xs.append(seg['mid'][0]); ys.append(seg['mid'][1])
+        h = w / 2.0
+        if seg['type'] == 'line':
+            dx, dy = p1[0] - p0[0], p1[1] - p0[1]; L = math.hypot(dx, dy) or 1.0; nx, ny = -dy / L * h, dx / L * h
+            xs = [x + s * nx for x in xs for s in (-1, 1)]; ys = [y + s * ny for y in ys for s in (-1, 1)]
+            return [[min(xs), min(ys), min(z0, z0 + H)], [max(xs), max(ys), max(z0, z0 + H)]]
+        return [[min(xs) - h, min(ys) - h, min(z0, z0 + H)], [max(xs) + h, max(ys) + h, max(z0, z0 + H)]]
+    except Exception:
+        return None
 
 def mep_curve(ctx, eid, rec):
     f = rec['fields']; cu = Gm.primary_curve(f)
