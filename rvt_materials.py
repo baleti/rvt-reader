@@ -145,3 +145,21 @@ def fill_patterns(file):
             if isinstance(g, dict): grids.append({'angle': float(g.get('m_angle', 0)), 'origin': [float(v) for v in g.get('m_origin') or (0, 0)], 'deltas': [float(v) for v in g.get('m_deltas') or (0, 0)], 'segs': [float(v) for v in g.get('m_segs') or []]})
         out[eid] = {'id': eid, 'name': fp.get('m_name'), 'target': fp.get('m_fpTarget'), 'orientation': fp.get('m_fpOrientation'), 'scale': fp.get('m_scale'), 'window': fp.get('m_windowSize'), 'grids': grids}
     return out
+
+
+def render_colors(file):
+    """appearance (render) colour per material id: {mid: {'shading': Shading colour, 'render': (r,g,b) 0-255 from the appearance asset's '<schema>_color' / '*_diffuse' property (None if the asset has none),
+    'bump': texture library path of a bump map, 'texture': diffuse texture library path}}. For most generic / concrete / paint assets the render colour equals the shading colour; metals / textured
+    materials differ (e.g. 'Roofing - Asphalt Shingle': shading 155 grey, render diffuse white + shingle bitmap)."""
+    out = {}
+    for mid, m in material_table(file).items():
+        a = m.get('appearance') or {}; pr = a.get('properties') if isinstance(a.get('properties'), dict) else {}; rc = None
+        for k, v in pr.items():
+            kl = k.lower()
+            if ('tint' in kl or 'common_' in kl) or not (kl.endswith('_color') or kl.endswith('_diffuse') or kl.endswith('diffuse_color')): continue
+            if isinstance(v, (list, tuple)) and len(v) >= 3 and all(isinstance(x, (int, float)) for x in v[:3]) and max(v[:3]) <= 1.0001: rc = tuple(int(round(x * 255)) for x in v[:3]); break
+        if rc is None and a.get('diffuse'): rc = tuple(a['diffuse'])
+        tx = a.get('textures') or {}; bump = next((t.get('path') for k, t in tx.items() if 'bump' in k and t.get('path')), None)
+        tex = next((t.get('path') for k, t in tx.items() if 'bump' not in k and t.get('path')), None) or (m.get('texture') or {}).get('path')
+        out[mid] = {'shading': m.get('color'), 'render': rc, 'bump': bump, 'texture': tex}
+    return out
