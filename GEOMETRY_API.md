@@ -87,3 +87,5 @@ Known approximate: Rebar Total Bar Length / Reinforcement Volume (about 0.03% of
 * `rvt_repeating.repeating_details(file)`: repeating detail components (path, spacing, layout, number, placement frames; detail symbol curves via element_curves). Validated on 2020 Commercial.
 * `rvt_materials.fill_patterns(file)`: fill pattern definitions (grids angle/origin/deltas/segs, drafting vs model target), 53/53 names = oracle.
 * `element_mesh` for SiteSurface/Toposolid: `mat` = instance parameter Material (-1002107) when no face style exists.
+* `rvt_materials.render_colors(file)`: appearance (render) colour, bump and texture library paths per material (2026-10-18).
+* `rvt_viewdisp.view_display(file)`: per-view display style (surfaces enum: 2 HLR, 7 FlatColors verified, 1 Wireframe, 3-6 shaded family), silhouettes, shadows, lights, background (type, sky/ground colour) from DBView*.m_pViewDisplayMgr (2026-10-18).
