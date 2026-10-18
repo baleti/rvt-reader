@@ -28,6 +28,9 @@ def _mesh(doc, eid, detail):
 
 _FORM_NODE_CATS = {-2001060, -2008087, -2001120, -2001040}      # electrical fixtures, lighting devices, lighting fixtures, electrical equipment: the categories the node rule was validated on (rme_basic 2020: 926/926); structural families regressed (2026 Snowdon Structural -482 volumes)
 
+import os
+_DROPMASK = int(os.environ.get('RVT_DROPMASK', '0x4000000'), 16)
+
 def _drop_form_nodes(doc, eid, m, detail):
     """Revit's Volume/Area ignore a symbol geometry node whose GInfo.m_controlCommand has bit 26 (0x4000000) without bit 15 (0x8000) when another node remains
     (rme_basic 2020: electrical fixtures cc [0, 0x4000000] -> only the first solid, Passive Infrared devices [0x8000, 0x4008000] -> both; 3/3 and 2/2 samples). Single-instance symbols only."""
@@ -37,7 +40,7 @@ def _drop_form_nodes(doc, eid, m, detail):
         sid = int(EM._ob(ii[0]['m_instanceInfo']).get('m_symbolId')); sg, si = EM._geos_f(doc.rec(sid)['fields'], detail)
         ccs = [int((g.get('m_GInfo') or {}).get('m_controlCommand') or 0) for g in sg]
         fl = [int((g.get('m_GInfo') or {}).get('m_flags') or 0) for g in sg]
-        drop = {100000 + i for i, c in enumerate(ccs) if (c & 0x4000000) and not (c & 0x8000) and not (fl[i] & 0xE0)}      # nodes with flag bits 0xE0 (pipe fittings at Medium: cc [0x4008000, 0x4000000, 0x4000000], Revit counts all three) are not touched
+        drop = {100000 + i for i, c in enumerate(ccs) if i > 0 and (c & _DROPMASK) and not (c & 0x8000) and not (fl[i] & 0xE0)}          # i > 0: a flagged FIRST node (2024+ Snowdon fixtures [0x4000000, 0]) is counted (25 of 25 exact without the drop, 0 of 25 with it)      # nodes with flag bits 0xE0 (pipe fittings at Medium: cc [0x4008000, 0x4000000, 0x4000000], Revit counts all three) are not touched
         if not drop or len(drop) >= len(ccs): return m
         keep = [i for i, n in enumerate(m['nid']) if n not in drop]
         return {k: ([v[i] for i in keep] if isinstance(v, list) and len(v) == len(m['nid']) else v) for k, v in m.items()}
@@ -95,9 +98,10 @@ def geom_params(doc, eid, f, cat, cls='FamilyInstance'):
                 if ni < 2 * 10**7: fa[fi] += a[i]
             if fa: out['Area'] = float(max(fa.values()))
         return out
-    m = _mesh(doc, eid, volume_detail(doc))
+    vd_ = 2 if cat == -2008234 else volume_detail(doc)          # Plumbing Equipment follows Medium even in 2026 files (Snowdon Plumbing 2026: 15 of 15 Medium, 0 of 15 Fine; 2024 identical)
+    m = _mesh(doc, eid, vd_)
     if m is None: return {'Volume': 0.0, 'Area': 0.0} if cls == 'FamilyInstance' and cat not in (CAT_PANEL,) else out
-    if cls == 'FamilyInstance' and m.get('source') == 'symbol_instance' and cat in _FORM_NODE_CATS: m = _drop_form_nodes(doc, eid, m, volume_detail(doc))
+    if cls == 'FamilyInstance' and m.get('source') == 'symbol_instance' and cat in _FORM_NODE_CATS: m = _drop_form_nodes(doc, eid, m, vd_)
     vol, closed, area, _ = M.volume_by_node(m['tris'], m.get('meta'), m['nid'], fid=m.get('fid'))
     if cat == -2008049 and cls == 'FamilyInstance' and volume_detail(doc) == 2:       # pipe fittings: Revit's Volume is the Fine solid even in files whose other families follow Medium (rme_basic 2020, 40 samples: every fitting whose Medium and Fine bodies differ matches Fine); Area stays Medium (exact)
         m3 = _mesh(doc, eid, 3)
