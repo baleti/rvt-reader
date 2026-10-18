@@ -1076,3 +1076,4 @@ ALL    60   8976010              94.9     95.0
 ```
 
 Host (String) rules (c3-geometry, 2026-10-18): FamilyInstance whose host is a Toposolid -> 'Sub-Division' (Snowdon Site 2024: 43/43 missing values now ok, pout_c32 vs pout_c30, no other row changed; same 43 in 2025/2026). No host and no associated level -> 'None' (Snowdon Electrical: 392 per year in the oracle; validation of that rule in pout_c32 Electrical 2024 pending).
+Validated (pout_c32, Snowdon Electrical 2024): the 'None' rule fixes all 392 missing Host values (ok 182,580 -> 182,972 of 193,273 values, no row changed otherwise). Both Host rules stay; they are in the next full run (not yet in FINAL #4's 94.9%: expected +0.3% on the 2024-2026 Electrical / Site files).

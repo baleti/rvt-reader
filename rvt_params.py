@@ -329,6 +329,7 @@ def params(path, geom=None):
             v_ = _lm(t_)
             if v_: _setp(o_['params'], nm_, 'String', v_)
     if not os.environ.get('RVT_NOHOST'): _host_params(out, recs)
+    if not os.environ.get('RVT_NORBN'): _rebar_number(out, recs)
     if not os.environ.get('RVT_NOVIEWSHEET'): _view_sheet_params(out, recs)
     _thermal_params(out, recs); _material_type(out, recs)
     _circuit_params(out, recs); _wire_params(out, recs); _fi_circuit_params(out, recs); _fi_system_params(out, recs); _hub_params(out, recs, _file_year(path))
@@ -819,6 +820,30 @@ def _host_params(out, recs):
         else:
             v = famtype(h)
             if v: d['Host|String'] = v
+
+def _rebar_number(out, recs):
+    """Rebar Number (String) = the number stored in the rebar's cell list (m_cellList.m_cells[*].m_schemaId2SubelemIdNumbers[0].second[0].second); 40 of 40 sampled rebars of rst_basic 2020 carry exactly the oracle value."""
+    def find(o, depth=0):
+        if depth > 4: return None
+        if isinstance(o, dict):
+            if 'm_schemaId2SubelemIdNumbers' in o:
+                try:
+                    v = o['m_schemaId2SubelemIdNumbers'][0]['second'][0]['second']
+                    return int(v) if isinstance(v, (int, float)) and not isinstance(v, bool) else None
+                except Exception: return None
+            for k, v in o.items():
+                if k.startswith('m_pParam'): continue
+                r = find(v, depth + 1)
+                if r is not None: return r
+        elif isinstance(o, list):
+            for v in o[:6]:
+                r = find(v, depth + 1)
+                if r is not None: return r
+        return None
+    for eid, o in out.items():
+        if o['class'] not in ('Rebar', 'RebarInSystem'): continue
+        v = find(recs[eid]['fields'].get('m_cellList'))
+        if v is not None and v > 0: o['params']['Rebar Number|String'] = str(v)
 
 if __name__ == '__main__':
     p = params(sys.argv[1])
