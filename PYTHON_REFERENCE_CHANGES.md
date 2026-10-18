@@ -44,3 +44,7 @@ Since you poll mtimes: rvt_mesh.py/rvt_elemmesh.py changed again today (ruled su
 * rvt_geomparams._drop_form_nodes: drops only symbol nodes with index > 0 (was any index); env RVT_DROPMASK (hex, default 0x4000000) selects the control-command bit.
 * rvt_geomparams.geom_params: Plumbing Equipment (category -2008234) uses the Medium mesh for Volume/Area in 2026 files.
 * rvt_params: IndependentTag Leader Line/Leader Type (inline m_taggedEntitiesCell and 2025 m_cellList m_references), FamilyInstance Enable Analytical Model, ElementGroup Type/Type Id/Family/Family and Type, SpotElevation Leader, RoomElem Room Name/Number, int 0xFFFFFFFF -> -1, view Sheet Number '---' fallback, marker Sheet Name / Associated Level. No mesh/geometry change.
+* rvt_geomparams.geom_params: Structural Framing (-2001320) Cut Length from the mesh extent along the location line.
+* 2026-10-18 rvt_viewdisp.view_clip (new, Python only), rvt_params: Far Clipping / Far Clip Offset / Crop View via view_clip; rvt_geomparams.room_params floor-face selection for stepped rooms; Structural Framing Cut Length; Unconnected Height of constrained walls; Elevation from Level 0 without level.
+* rvt_geom.mep_curve Slope sign flipped ((s - e)/hz).
+* rvt_geom.mep_curve: round duct Area/Diameter, Slope sign, engine results from m_pDesignPropManager; rvt_params centre-line inheritance of Area/Slope/Additional Flow/Loss Coefficient.

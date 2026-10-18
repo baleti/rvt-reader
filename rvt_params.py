@@ -126,6 +126,7 @@ def params(path, geom=None):
             if isinstance(v0, (int, float)): d.setdefault(k, float(v0))
         if c in ('RbsPipeCurve', 'RbsDuctCurve', 'RbsConduitCurve', 'CableTray'):
             g_ = Gm.mep_curve(f, c, lv); k_ = g_.pop('_end_k', None); R_ = g_.pop('_end_R', None); d.update(g_)
+            if 'System Type' in g_: d.pop('System Type', None); _setp(d, 'System Type', 'ElementId', g_['System Type'])          # beats the learned id-specific slots (stale type ids)
             t_ = d.get('Insulation Thickness', 0.0)                      # no insulation recorded on the run: the insulation surface is the outer surface
             t_ = float(t_) if isinstance(t_, (int, float)) and not isinstance(t_, bool) else None
             if k_ is not None and t_ is not None:                 # insulation surface = outer radius + thickness
@@ -210,6 +211,9 @@ def params(path, geom=None):
                     except Exception: continue
                     if bid_ == -1001300 and isinstance(p_.get('m_value'), float): _setp(d, 'Head Height', 'Double', f['m_elevation'] + p_['m_value']); break
             for c_ in (((f.get('m_cellList') or {}).get('obj') or {}).get('m_cells') or []):          # structural members: join cutbacks stored in the cell (m_cutbacks = [start, end]; rst_basic 2020: 139 / 117 members exact)
+                co2_ = (c_.get('obj') if isinstance(c_, dict) else None) or {}
+                for nm_, k_ in (('z Offset Value', 'm_zOffsets'), ('y Offset Value', 'm_yOffsets')):          # beam justification offsets: the START value is the parameter (Snowdon Structural 2024: -0.2083 of [-0.2083, 0.0])
+                    if isinstance(co2_.get(k_), list) and co2_[k_] and isinstance(co2_[k_][0], float): _setp(d, nm_, 'Double', co2_[k_][0])
                 cb_ = ((c_.get('obj') if isinstance(c_, dict) else None) or {}).get('m_cutbacks')
                 if isinstance(cb_, list) and len(cb_) == 2 and all(isinstance(v_, float) for v_ in cb_):
                     _setp(d, 'Start Join Cutback', 'Double', cb_[0]); _setp(d, 'End Join Cutback', 'Double', cb_[1]); break
@@ -279,6 +283,24 @@ def params(path, geom=None):
             if d.get('Category|ElementId') in (-2000023, -2000014):          # door / window types: Rough Width / Height absent = 0 (765 of 901 corpus values)
                 for nm_ in ('Rough Width', 'Rough Height'):
                     if not any(k_.split('|')[0] == nm_ and '|Double' in k_ for k_ in d) and not isinstance(d.get(nm_), float): _setp(d, nm_, 'Double', 0.0)
+        if c == 'FamilyInstance' and not any(k_.split('|')[0] == 'Elevation from Level' for k_ in d) and f.get('m_assocLevelId') in _INVALID:          # no level: Revit reports Elevation from Level 0 (rst_basic mass, rme_basic air terminals, commercial fixtures)
+            _setp(d, 'Elevation from Level', 'Double', 0.0)
+        if c == 'SWall' and f.get('m_assocLevelId') not in _INVALID and f.get('m_upToLevelId') not in _INVALID:          # level-constrained wall: Unconnected Height shows the real height (top level + top offset - base level - base offset), not the stored placeholder (4 m / 20 / 37.5 ft defaults)
+            bl_, tl_ = lv.get(int(f['m_assocLevelId'])), lv.get(int(f['m_upToLevelId']))
+            def _g(nm_):
+                for k2_, v2_ in d.items():
+                    if k2_.split('|')[0] == nm_ and isinstance(v2_, float): return v2_
+                return 0.0
+            if bl_ is not None and tl_ is not None: _setp(d, 'Unconnected Height', 'Double', (tl_ + _g('Top Offset')) - (bl_ + _g('Base Offset')))
+        cm_ = f.get('m_pConnectorManager') or f.get('m_pConnectorMgr')          # MEP section number: the connectors' modifier m_nSection (rme_basic 2020 ducts 425 of 449)
+        if isinstance(cm_, dict) and not any(k_.split('|')[0] == 'Section' for k_ in d):
+            cm_ = cm_.get('obj') or cm_; secs_ = []
+            for cp_ in cm_.get('m_connPtrArray') or []:
+                for md_ in ((cp_.get('obj') if isinstance(cp_, dict) else None) or {}).get('m_modifiers') or []:
+                    ns_ = ((md_.get('obj') if isinstance(md_, dict) else None) or {}).get('m_nSection')
+                    if isinstance(ns_, int) and 0 <= ns_ < 100000: secs_.append(ns_)
+            if secs_: _setp(d, 'Section', 'Integer', secs_[0])
+            if secs_ and secs_[0] == 0 and c in ('RbsDuctCurve', 'RbsPipeCurve', 'RbsFlexDuctCurve', 'RbsFlexPipeCurve', 'RbsConduitCurve'): _setp(d, 'System Type', 'ElementId', -1)          # section 0 = not part of any system (rme_basic 408694: stale stored system type, Revit -1)
         for k_ in [k_ for k_, v_ in d.items() if isinstance(v_, int) and not isinstance(v_, bool) and v_ == 0xFFFFFFFF]: d[k_] = -1          # an int parameter never holds uint32 max: it is the -1 'none' sentinel (RoomElem Occupancy Unit, 1812 values)
         out[eid] = {'class': c, 'params': d}
     if geom:
@@ -360,6 +382,17 @@ def params(path, geom=None):
     if not os.environ.get('RVT_NOHOST'): _host_params(out, recs)
     if not os.environ.get('RVT_NORBN'): _rebar_number(out, recs)
     if not os.environ.get('RVT_NOVIEWSHEET'): _view_sheet_params(out, recs)
+    if not os.environ.get('RVT_NOVIEWCLIP'):
+        try:
+            import rvt_viewdisp as VD
+            for ve_, cl_ in VD.view_clip(path).items():          # section / elevation depth + crop (rvt_viewdisp.view_clip, verified 2020-2025)
+                for t_ in (ve_, cl_.get('viewer')):
+                    if t_ in out:
+                        pp_ = out[t_]['params']
+                        if cl_.get('far_clipping') is not None: _setp(pp_, 'Far Clipping', 'Integer', cl_['far_clipping'])
+                        if cl_.get('far_clip_offset') is not None: _setp(pp_, 'Far Clip Offset', 'Double', cl_['far_clip_offset'])
+                        if cl_.get('crop_active') is not None: _setp(pp_, 'Crop View', 'Integer', cl_['crop_active'])
+        except Exception: pass
     _thermal_params(out, recs); _material_type(out, recs)
     _circuit_params(out, recs); _wire_params(out, recs); _fi_circuit_params(out, recs); _fi_system_params(out, recs); _hub_params(out, recs, _file_year(path))
     # round ducts (type Family Name 'Round Duct'): Area = pi d L and a Diameter, not the rectangular 2 (w + h) L
@@ -470,7 +503,8 @@ def params(path, geom=None):
             for k_, v_ in out[ow]['params'].items():
                 if k_.split('|')[0] in INH: o_['params'][k_] = v_
             for k_, v_ in out[ow]['params'].items():
-                if (' End ' in k_ and 'Elevation' in k_) or k_.split('|')[0] in ('Area', 'Wall Thickness', 'Top Elevation', 'Bottom Elevation', 'Middle Elevation', 'Invert Elevation', 'Fixture Units'): o_['params'].setdefault(k_, v_)
+                if k_.split('|')[0] in ('Area', 'Slope', 'Additional Flow', 'Loss Coefficient'): o_['params'] = {kk: vv for kk, vv in o_['params'].items() if kk.split('|')[0] != k_.split('|')[0]}; o_['params'][k_] = v_          # the centre line's own Area slot is stale for round ducts: the owner run's value
+                elif (' End ' in k_ and 'Elevation' in k_) or k_.split('|')[0] in ('Wall Thickness', 'Top Elevation', 'Bottom Elevation', 'Middle Elevation', 'Invert Elevation', 'Fixture Units'): o_['params'].setdefault(k_, v_)
     # OmniClass Title follows from the OmniClass Number (standard table; omniclass_titles.json holds the 73 numbers seen in the corpus, one title each)
     try: _OT = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'omniclass_titles.json')))
     except Exception: _OT = {}

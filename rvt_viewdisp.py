@@ -27,3 +27,35 @@ def view_display(file):
     return out
 
 # background: m_background.m_type 256 / 257 / 512 (257 = sky + ground gradient with the colours below on 2020 Commercial 206158, 512 = image background (m_oStaticRRTRenderSettings.m_BkIamgeSettings)); meaning of 256 vs 257 not separated (no oracle).
+
+def view_clip(file):
+    """Section / elevation / callout depth and crop state, from the Viewer (marker) record's m_boundedSpace and the DBViewSection's m_backClipping.
+    view_clip(file) -> {view eid: {'viewer', 'far_clip_offset' (ft, m_boundOffset[2][0]), 'far_clip_active' (m_boundActive[2][0]), 'far_clipping' (0 no clip, 1 clip without line, 2 clip with line),
+    'crop_active' (any x / y bound active), 'bound_offset' ([[x lo, x hi], [y lo, y hi], [z near, z far]] in the view frame), 'bound_active', 'origin', 'basis', 'annotation_crop_active'}}
+    far_clipping = DBViewSection.m_backClipping when valid; the 0xFFFFFFFF 'inherit' value means 2 if the far clip is active or the view has no marker, else 0.
+    Verified against Revit's parameter dump (Snowdon Structural 2024, 15 section / elevation views): Far Clip Offset 10 of 10 exact, Far Clipping all, Crop View all."""
+    import rvt_params as RP
+    try: year = int(RP._file_year(file))
+    except Exception: year = 2024
+    ctx = RM._ctx(file); viewers = {}
+    for e, r in ctx.recs.items():
+        f = r['fields'] or {}
+        bs = f.get('m_boundedSpace')
+        if isinstance(bs, dict) and f.get('m_dbViewId') not in (None, 0xFFFFFFFF, 0xFFFFFFFFFFFFFFFF) and 'm_boundOffset' in bs:
+            viewers[int(f['m_dbViewId'])] = (e, f, bs)
+    out = {}
+    for e, r in ctx.recs.items():
+        if not r['class'].startswith('DBView'): continue
+        vw = viewers.get(e); bc = (r['fields'] or {}).get('m_backClipping')
+        d = {'viewer': None, 'far_clip_offset': None, 'far_clip_active': None, 'crop_active': None, 'bound_offset': None, 'bound_active': None, 'origin': None, 'basis': None, 'annotation_crop_active': None}
+        if vw:
+            ve, vf, bs = vw; ba = bs.get('m_boundActive') or []; bo = bs.get('m_boundOffset') or []
+            d.update(viewer=ve, bound_offset=bo, bound_active=ba, origin=bs.get('m_orig'), basis=bs.get('m_basis'), annotation_crop_active=vf.get('m_bAnnotationCropActive'))
+            try:
+                d['far_clip_offset'] = bo[2][0]; d['far_clip_active'] = ba[2][0]; d['crop_active'] = int(any(ba[i][j] for i in (0, 1) for j in (0, 1)))
+            except Exception: pass
+        if isinstance(bc, int) and bc in (0, 1, 2): d['far_clipping'] = bc
+        elif bc is not None: d['far_clipping'] = (2 if d['far_clip_active'] else 0) if vw else (2 if year >= 2024 else 0)          # no marker = a view TYPE record: Revit's default changed from 'no clip' (<= 2023) to 'clip with line' (2024+)
+        else: d['far_clipping'] = None
+        if d['far_clipping'] is not None or vw: out[e] = d
+    return out

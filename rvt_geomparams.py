@@ -136,6 +136,15 @@ def geom_params(doc, eid, f, cat, cls='FamilyInstance'):
                 out['Width'] = float(p2[:, 0].max() - p2[:, 0].min())
             out['Height'] = float(T2[:, 2].max() - T2[:, 2].min())
     if cat == -2008010: out.pop('Area', None)          # duct fittings: Revit's Area is not half the surface (0 of 311 right in rme_basic 2020; pipe fittings 119 of 119); better absent than wrong
+    if cat == -2001320 and closed:                         # structural framing: Cut Length = extent of the solid along the straight location curve (rst_basic 2020: 11 of 11 exact to 1e-5)
+        try:
+            import rvt_geometry as RG, rvt_geom as Gm2
+            cu_ = Gm2.primary_curve(f); sd_ = RG.seg_dict(cu_) if cu_ is not None else None
+            if sd_ and sd_['type'] == 'line':
+                p0_ = np.array(sd_['p0'], float); d_ = np.array(sd_['p1'], float) - p0_; l_ = float(np.linalg.norm(d_))
+                if l_ > 1e-9:
+                    t_ = (np.array(m['tris'], float).reshape(-1, 3) - p0_) @ (d_ / l_); out['Cut Length'] = float(t_.max() - t_.min())
+        except Exception: pass
     if cat == CAT_MULLION:
         tr = _trf(f)
         if tr is not None:
@@ -151,8 +160,16 @@ def room_params(doc, eid):
     T = np.array(m['tris'], float); n = np.cross(T[:, 1] - T[:, 0], T[:, 2] - T[:, 0]); ln = np.linalg.norm(n, axis=1)
     ok = ln > 1e-12
     if not ok.any(): return {}
-    zmin = T[:, :, 2].min()
-    bot = ok & (np.abs(n[:, 2] / np.where(ok, ln, 1)) > 0.999) & (np.abs(T[:, :, 2].max(1) - zmin) < 1e-6)
+    zmin = T[:, :, 2].min(); zmax = T[:, :, 2].max()
+    horiz = ok & (np.abs(n[:, 2] / np.where(ok, ln, 1)) > 0.999)
+    bot = horiz & (np.abs(T[:, :, 2].max(1) - zmin) < 1e-6)
+    fid_ = m.get('fid')
+    if horiz.any() and fid_ is not None and len(fid_) == len(T):          # stepped / sloped rooms (rme_basic spaces, 379575: floor 194.49 at z 0.80 with a notch, ceiling 197.04 = Revit's Area): the room Area is the largest horizontal face (floor or ceiling)
+        fa_ = collections.defaultdict(float)
+        for i in np.nonzero(horiz)[0]: fa_[fid_[i]] += ln[i] / 2
+        if fa_:
+            fb_ = max(fa_, key=fa_.get); b2_ = horiz & np.array([fid_[i] == fb_ for i in range(len(T))])
+            if b2_.any() and fa_[fb_] > 1.0001 * (ln[bot].sum() / 2 if bot.any() else 0.0): bot = b2_
     if not bot.any(): return {}
     ed = collections.Counter()
     for tri in T[bot]:
