@@ -1074,3 +1074,5 @@ year files    values  before%  exact%  exact+approx%   Double / Integer / String
 2026    9   1113559     84.7    92.8     93.0        84.6 / 95.2 / 96.1 / 98.0     1.5 1.8 2.0 1.6
 ALL    60   8976010              94.9     95.0
 ```
+
+Host (String) rules (c3-geometry, 2026-10-18): FamilyInstance whose host is a Toposolid -> 'Sub-Division' (Snowdon Site 2024: 43/43 missing values now ok, pout_c32 vs pout_c30, no other row changed; same 43 in 2025/2026). No host and no associated level -> 'None' (Snowdon Electrical: 392 per year in the oracle; validation of that rule in pout_c32 Electrical 2024 pending).
