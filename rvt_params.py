@@ -810,6 +810,7 @@ def _host_params(out, recs):
             if ln: d['Host|String'] = 'Level : ' + ln
         elif hc == 'SiteSurface':                                       # a subregion is a SiteSurface hosted by the toposurface
             sh = recs[h]['fields'].get('m_hostId'); d['Host|String'] = 'Subregion' if sh is not None and int(sh) not in _INVALID else 'Surface'
+        elif hc == 'Toposolid': d['Host|String'] = 'Sub-Division'          # instances on a toposolid (2024-2026 Snowdon Site: 43 per file)
         elif hc == 'BoundaryConditions': d['Host|String'] = 'Boundary Conditions'
         elif hc == 'BuildingPad':
             t = out[h]['params'].get('Type Id', recs[h]['fields'].get('m_buildingPadTypeId'))
