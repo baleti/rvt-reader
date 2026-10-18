@@ -795,7 +795,8 @@ def _host_params(out, recs):
         if h in _INVALID or hc is None:
             lv = f.get('m_assocLevelId'); ln = nm(int(lv)) if lv is not None and int(lv) not in _INVALID else None
             d['Host Id|ElementId'] = -1
-            if ln: d['Host|String'] = 'Level : ' + ln
+            d['Host|String'] = ('Level : ' + ln) if ln else (None if os.environ.get('RVT_HOSTNONE_OFF') else 'None')      # no host and no associated level: Revit prints 'None' (392 Snowdon Electrical, 43 Site, 77 rst_advanced values)
+            if d['Host|String'] is None: del d['Host|String']
             continue
         d['Host Id|ElementId'] = h if hc in _HOSTID_SELF else -1
         if hc == 'SketchPlane':
