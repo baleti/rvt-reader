@@ -14,6 +14,20 @@
 
 Everything is plain Python plus `olefile` (and optionally [rvt-core](https://github.com/baleti/rvt-core) for speed).
 
+## Gallery
+
+Everything below was decoded straight from the `.rvt` files by this reader (geometry, materials, levels and grids), then drawn with [rvt-viewer](https://github.com/baleti/rvt-viewer). No Revit was involved. The models are the standard Autodesk sample files, which are not redistributed here.
+
+<table>
+<tr>
+<td width="50%"><img src="assets/screenshot-snowdon-structural.png" alt="Snowdon Towers structural model, Revit 2024"><br><sub>Snowdon Towers, structural (Revit 2024): slabs, columns, framing, curved ramp walls, levels and grids</sub></td>
+<td width="50%"><img src="assets/screenshot-snowdon-facades.png" alt="Snowdon Towers facades model, Revit 2026"><br><sub>Snowdon Towers, facades (Revit 2026): masonry facades with per-face materials and arched openings</sub></td>
+</tr>
+<tr>
+<td colspan="2" align="center"><img src="assets/screenshot-residential.png" alt="Residential sample project, Revit 2020" width="50%"><br><sub>Residential sample project (Revit 2020): topography, roof, walls, windows, planting and site elements</sub></td>
+</tr>
+</table>
+
 ## Quick start
 
 ```bash
