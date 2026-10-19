@@ -103,6 +103,8 @@ def params(path, geom=None):
             o = E.S_(r['fields'], 'm_pSurface', 'm_origin')
             if o: lv[eid] = o[2]
     uid = rvt_uid.unique_ids(path)
+    try: _yr_ = int(_file_year(path))
+    except Exception: _yr_ = 0
     st = rvt_ifc.stored({e: [r] for e, r in recs.items()})
     import rvt_scan as S; own = S.owners(path); out = {}; refelev_ = {}
     for eid, r in recs.items():
@@ -212,6 +214,9 @@ def params(path, geom=None):
                     if bid_ == -1001300 and isinstance(p_.get('m_value'), float): _setp(d, 'Head Height', 'Double', f['m_elevation'] + p_['m_value']); break
             for c_ in (((f.get('m_cellList') or {}).get('obj') or {}).get('m_cells') or []):          # structural members: join cutbacks stored in the cell (m_cutbacks = [start, end]; rst_basic 2020: 139 / 117 members exact)
                 co2_ = (c_.get('obj') if isinstance(c_, dict) else None) or {}
+                for nm_, k_ in (('y Justification', 'm_yJustification'), ('z Justification', 'm_zJustification')):          # beam justification enums: first (start) entry (rst_advanced 2020: 397 of 397)
+                    if isinstance(co2_.get(k_), list) and co2_[k_] and isinstance(co2_[k_][0], int): _setp(d, nm_, 'Integer', co2_[k_][0])
+                if isinstance(co2_.get('m_yzJustification'), int): _setp(d, 'yz Justification', 'Integer', co2_['m_yzJustification'])
                 for nm_, k_ in (('z Offset Value', 'm_zOffsets'), ('y Offset Value', 'm_yOffsets')):          # beam justification offsets: the START value is the parameter (Snowdon Structural 2024: -0.2083 of [-0.2083, 0.0])
                     if isinstance(co2_.get(k_), list) and co2_[k_] and isinstance(co2_[k_][0], float): _setp(d, nm_, 'Double', co2_[k_][0])
                 cb_ = ((c_.get('obj') if isinstance(c_, dict) else None) or {}).get('m_cutbacks')
@@ -292,6 +297,9 @@ def params(path, geom=None):
                     if k2_.split('|')[0] == nm_ and isinstance(v2_, float): return v2_
                 return 0.0
             if bl_ is not None and tl_ is not None: _setp(d, 'Unconnected Height', 'Double', (tl_ + _g('Top Offset')) - (bl_ + _g('Base Offset')))
+        if c == 'AnalyticalMember': _setp(d, 'Has Association', 'Integer', 1)          # every analytical member of the 2023+ model is associated with its physical member (600 of 600, rst_advanced 2023)
+        elif c == 'FamilyInstance' and any(k_.split('|')[0] == 'Enable Analytical Model' for k_ in d):
+            ea_ = next(v_ for k_, v_ in d.items() if k_.split('|')[0] == 'Enable Analytical Model'); _setp(d, 'Has Association', 'Integer', 1 if ea_ else 0)          # a physical member with its analytical model enabled has an association
         cm_ = f.get('m_pConnectorManager') or f.get('m_pConnectorMgr')          # MEP section number: the connectors' modifier m_nSection (rme_basic 2020 ducts 425 of 449)
         if isinstance(cm_, dict) and not any(k_.split('|')[0] == 'Section' for k_ in d):
             cm_ = cm_.get('obj') or cm_; secs_ = []
@@ -301,6 +309,21 @@ def params(path, geom=None):
                     if isinstance(ns_, int) and 0 <= ns_ < 100000: secs_.append(ns_)
             if secs_: _setp(d, 'Section', 'Integer', secs_[0])
             if secs_ and secs_[0] == 0 and c in ('RbsDuctCurve', 'RbsPipeCurve', 'RbsFlexDuctCurve', 'RbsFlexPipeCurve', 'RbsConduitCurve'): _setp(d, 'System Type', 'ElementId', -1)          # section 0 = not part of any system (rme_basic 408694: stale stored system type, Revit -1)
+        if c == 'FamilyInstance' and d.get('Category|ElementId') == -2001320 and not any(k_.split('|')[0] == 'Length' for k_ in d):          # structural framing Length = the location curve length (rst_basic 2020: 21 missing; Revit 13.9193 vs curve 13.91942)
+            cu_ = Gm.primary_curve(f)
+            if cu_ is not None and Gm.curve_length(cu_) is not None: _setp(d, 'Length', 'Double', Gm.curve_length(cu_))
+        if _yr_ >= 2026:                                                  # OmniClass -> Classification (2026); electrical circuits: Core Type 0, Circuit State 0
+            for k_ in [k_ for k_ in d if k_.split('|')[0] in ('OmniClass Number', 'OmniClass Title')]:
+                k2_ = k_.replace('OmniClass', 'Classification')
+                if k2_ not in d: d[k2_] = d[k_]
+            if c == 'RbsElectricalSystem': _setp(d, 'Core Type', 'Integer', 0); _setp(d, 'Circuit State', 'Integer', 0)
+        if _yr_ >= 2026 and d.get('Category|ElementId') == -2001320:          # Revit 2026: a structural framing member's 'Length' is 'System Length' (Snowdon Structural 2026: 942 members, no 'Length')
+            lv_ = next((v_ for k_, v_ in d.items() if k_.split('|')[0] == 'Length' and isinstance(v_, float)), None)
+            if lv_ is not None: _setp(d, 'System Length', 'Double', lv_)
+        if _yr_ >= 2025:                                                  # Revit 2025 renamed the electrical loads: 'Apparent Load' / 'True Load' -> 'Apparent Power' / 'True Power' (also the Branch Circuit / Feed Through Lugs variants)
+            for k_ in [k_ for k_ in d if 'Apparent Load' in k_ or 'True Load' in k_]:
+                k2_ = k_.replace('Apparent Load', 'Apparent Power').replace('True Load', 'True Power')
+                if k2_ not in d: d[k2_] = d[k_]
         for k_ in [k_ for k_, v_ in d.items() if isinstance(v_, int) and not isinstance(v_, bool) and v_ == 0xFFFFFFFF]: d[k_] = -1          # an int parameter never holds uint32 max: it is the -1 'none' sentinel (RoomElem Occupancy Unit, 1812 values)
         out[eid] = {'class': c, 'params': d}
     if geom:
@@ -382,6 +405,13 @@ def params(path, geom=None):
     if not os.environ.get('RVT_NOHOST'): _host_params(out, recs)
     if not os.environ.get('RVT_NORBN'): _rebar_number(out, recs)
     if not os.environ.get('RVT_NOVIEWSHEET'): _view_sheet_params(out, recs)
+    if _yr_ >= 2025:                                                  # Revit 2025+ view / viewport parameters that are constant -1 (Sheet Collection, Referencing Sheet Collection) and, from 2026, Saved Position -1 / View Anchor 0
+        for o_ in out.values():
+            pp_ = o_['params']
+            if any(k_.split('|')[0] == 'Sheet Number' for k_ in pp_):
+                _setp(pp_, 'Sheet Collection', 'ElementId', -1)
+                if any(k_.split('|')[0] == 'Referencing Sheet' for k_ in pp_): _setp(pp_, 'Referencing Sheet Collection', 'ElementId', -1)
+                if _yr_ >= 2026: _setp(pp_, 'Saved Position', 'ElementId', -1); _setp(pp_, 'View Anchor', 'Integer', 0)
     if not os.environ.get('RVT_NOVIEWCLIP'):
         try:
             import rvt_viewdisp as VD
