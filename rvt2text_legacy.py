@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""rvt2text - plain-text extraction from Revit files (.rvt .rfa .rte .rft) with no Autodesk/ODA code.
+"""rvt2text - plain-text extraction from Revit files (.rvt .rfa .rte .rft) with no Autodesk code.
 
   header + project metadata, editors, external references, sheets (number / name / dates), and the distinct
   human-readable strings found in the model data (family, type, material, level, room, text-note names, ...).

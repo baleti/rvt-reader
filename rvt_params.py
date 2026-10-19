@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Per-element parameter dump from a Revit file, no Revit/ODA: stored values (schema-driven), learned field->parameter mapping,
+"""Per-element parameter dump from a Revit file, no Revit: stored values (schema-driven), learned field->parameter mapping,
 family parameters by caption, geometry-derived values (curve length, MEP elevations/areas, elevation from level), UniqueId and IfcGUID.
 usage: rvt_params.py FILE [--json OUT]    (prints a summary; --json writes {id: {...}})"""
 import sys, os, json, math, collections, re
