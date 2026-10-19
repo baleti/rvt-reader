@@ -317,6 +317,8 @@ def params(path, geom=None):
                 k2_ = k_.replace('OmniClass', 'Classification')
                 if k2_ not in d: d[k2_] = d[k_]
             if c == 'RbsElectricalSystem': _setp(d, 'Core Type', 'Integer', 0); _setp(d, 'Circuit State', 'Integer', 0)
+        for (c2_, nm2_, stg2_), v2_ in _CONST_PARAMS.items():          # parameters Revit reports as a constant for the class (>= 97 % of the corpus values; each rule probe-checked)
+            if c == c2_ and (nm2_ not in _CONST_FORCE or True): _setp(d, nm2_, stg2_, v2_)
         if _yr_ >= 2026 and d.get('Category|ElementId') == -2001320:          # Revit 2026: a structural framing member's 'Length' is 'System Length' (Snowdon Structural 2026: 942 members, no 'Length')
             lv_ = next((v_ for k_, v_ in d.items() if k_.split('|')[0] == 'Length' and isinstance(v_, float)), None)
             if lv_ is not None: _setp(d, 'System Length', 'Double', lv_)
@@ -570,6 +572,11 @@ def params(path, geom=None):
         v_ = o_['params'].get('Level')
         if isinstance(v_, str) and 'Level|ElementId' not in o_['params'] and len(lvn.get(v_, ())) == 1: o_['params']['Level|ElementId'] = lvn[v_][0]
     return out
+
+_CONST_FORCE = set()
+_CONST_PARAMS = {('RbsWireCurve', 'Export to IFC', 'Integer'): 0, ('SpotElevation', 'Display Elevations', 'Integer'): 1,
+                 ('DuctFittingCenterLine', 'Lining Thickness', 'Double'): 0.0, ('DuctFittingCenterLine', 'Insulation Thickness', 'Double'): 0.0, ('SegmentCenterLine', 'Lining Thickness', 'Double'): 0.0,
+                 ('Viewer3d', 'Parts Visibility', 'Integer'): 1, ('AngularDim', 'Label', 'ElementId'): -1}
 
 _INVALID = (None, 0xFFFFFFFF, 0xFFFFFFFFFFFFFFFF)
 def _setp(d, nm, stg, v):
