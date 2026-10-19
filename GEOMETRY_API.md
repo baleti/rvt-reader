@@ -91,3 +91,5 @@ Known approximate: Rebar Total Bar Length / Reinforcement Volume (about 0.03% of
 * `rvt_viewdisp.view_display(file)`: per-view display style (surfaces enum: 2 HLR, 7 FlatColors verified, 1 Wireframe, 3-6 shaded family), silhouettes, shadows, lights, background (type, sky/ground colour) from DBView*.m_pViewDisplayMgr (2026-10-18).
 * `rvt_worksets.worksets(path)` / `element_worksets(path)`: workset table (guid -> id, name, kind, default_visible) and element -> workset id; verified 2024 + 2026 (3407/3407, 3515/3515 elements, 5/5 user worksets) (2026-10-18).
 * rvt_params Host: 'Sub-Division' (toposolid host) and 'None' (no host, no level) rules, validated 2026-10-18 (Site 2024 43/43, Electrical 2024 392/392).
+
+Update 2026-10-19: new `rvt_viewdisp.view_clip(file)` (section / elevation far clip offset, far-clip active, Far Clipping enum, crop active, bounded-space frame; verified 2020-2026 against Revit parameters) next to `view_display`; fidelity table of record: FID_TABLE_FINAL.txt + fid-campaign/RESULTS.md (r1: FamilyInstance 99.8%, SWall 99.2%, RoomElem 99.4%, all other classes >= 99.9%).

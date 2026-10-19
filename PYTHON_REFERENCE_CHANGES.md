@@ -48,3 +48,5 @@ Since you poll mtimes: rvt_mesh.py/rvt_elemmesh.py changed again today (ruled su
 * 2026-10-18 rvt_viewdisp.view_clip (new, Python only), rvt_params: Far Clipping / Far Clip Offset / Crop View via view_clip; rvt_geomparams.room_params floor-face selection for stepped rooms; Structural Framing Cut Length; Unconnected Height of constrained walls; Elevation from Level 0 without level.
 * rvt_geom.mep_curve Slope sign flipped ((s - e)/hz).
 * rvt_geom.mep_curve: round duct Area/Diameter, Slope sign, engine results from m_pDesignPropManager; rvt_params centre-line inheritance of Area/Slope/Additional Flow/Loss Coefficient.
+* rvt_geomparams.geom_params: baluster-only Coarse-node filter.
+* rvt_params (2025+/2026 renames): Apparent/True Load -> Power (2025+), framing Length -> System Length (2026).

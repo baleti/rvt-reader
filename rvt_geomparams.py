@@ -102,6 +102,11 @@ def geom_params(doc, eid, f, cat, cls='FamilyInstance'):
     m = _mesh(doc, eid, vd_)
     if m is None: return {'Volume': 0.0, 'Area': 0.0} if cls == 'FamilyInstance' and cat not in (CAT_PANEL,) else out
     if cls == 'FamilyInstance' and m.get('source') == 'symbol_instance' and cat in _FORM_NODE_CATS: m = _drop_form_nodes(doc, eid, m, vd_)
+    if cls == 'FamilyInstance' and cat == -2000127 and m.get('source') == 'symbol_instance' and vd_ > 1:          # balusters: Revit's Volume/Area count only the geometry nodes that exist at Coarse detail (Arch_Link 2022: 25 of 25 vs 17 of 25 with every node; +4.4 % / +8.5 % otherwise)
+        m1_ = _mesh(doc, eid, 1)
+        if m1_ is not None:
+            keep_ = set(m1_['nid']); idx_ = [i for i, n_ in enumerate(m['nid']) if n_ in keep_]
+            if idx_ and len(idx_) < len(m['nid']): m = {k_: ([v_[i] for i in idx_] if isinstance(v_, list) and len(v_) == len(m['nid']) else v_) for k_, v_ in m.items()}
     vol, closed, area, _ = M.volume_by_node(m['tris'], m.get('meta'), m['nid'], fid=m.get('fid'))
     if cat == -2008049 and cls == 'FamilyInstance' and volume_detail(doc) == 2:       # pipe fittings: Revit's Volume is the Fine solid even in files whose other families follow Medium (rme_basic 2020, 40 samples: every fitting whose Medium and Fine bodies differ matches Fine); Area stays Medium (exact)
         m3 = _mesh(doc, eid, 3)
