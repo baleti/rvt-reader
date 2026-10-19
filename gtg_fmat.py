@@ -19,7 +19,7 @@ for eid,w in list(want.items())[:int(sys.argv[2]) if len(sys.argv)>2 else 10**9]
     rec(br['instances']); n+=1
     ws=set(w); cs=set(c)
     if ws==cs: same+=1
-    elif ws<=cs: sub+=1
+    elif ws<=cs: sub+=1; bad.append((eid,'SUBSET',dict(w),dict(c)))
     else: bad.append((eid,dict(w),dict(c)))
 print('elements',n,'same material set',same,'oracle set is subset of ours',sub,'other',len(bad))
 for b in bad[:6]: print(b)

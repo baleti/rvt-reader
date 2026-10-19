@@ -50,3 +50,4 @@ Since you poll mtimes: rvt_mesh.py/rvt_elemmesh.py changed again today (ruled su
 * rvt_geom.mep_curve: round duct Area/Diameter, Slope sign, engine results from m_pDesignPropManager; rvt_params centre-line inheritance of Area/Slope/Additional Flow/Loss Coefficient.
 * rvt_geomparams.geom_params: baluster-only Coarse-node filter.
 * rvt_params (2025+/2026 renames): Apparent/True Load -> Power (2025+), framing Length -> System Length (2026).
+* rvt_params: view Family/Type strings via DBViewType.m_systemFamilyIdx.
