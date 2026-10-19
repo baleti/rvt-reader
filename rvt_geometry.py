@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""rvt_geometry: element geometry decoded from a Revit file (no Revit, no ODA).
+"""rvt_geometry: element geometry decoded from a Revit file (no Revit).
 API:  element_geometry(file, element_id) -> dict   (see GEOMETRY_API.md)
       file_geometry_index(file) -> {element_id: class}   cheap listing
 Units: Revit internal feet, radians. Transforms are 4x4 row-major local->world."""

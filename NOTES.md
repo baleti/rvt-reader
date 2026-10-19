@@ -75,7 +75,6 @@ Nanjing MEP: E001..P800). Files with no sheets correctly yield none.
   mimemap:   .rvt = application/x-revit      .rfa = application/x-revit      .rte = application/x-revit      .rft = application/x-revit
 
 ## Ground truth from real Revit (2026-10-10)
-Offline Windows VM on host2 (see memory project_revit_windows_vm_host1), Revit 2020-2026 side by side, revit-ballet agent `/v1/jobs` (roslyn).
 `groundtruth/*.json` = per-file output (BFI format, sheets, levels, element count); `compare_gt.py` diffs rvt2text against it.
 Result: 24/24 files exact on Revit version + sheet list (68 sheets), 83/83 level names present. Found and fixed one bug this way:
 sheets whose drawn/checked/designed-by are short initials had no 'Designer' anchor (rvt_elements._chains_dated).
@@ -131,7 +130,6 @@ Structural coverage vs Revit's element list (cov_gt.py, host1 runs): 2020-2023 1
 Fixes since the BFS breakthrough: members joined per partition (records straddle gzip members), defined-handle set for back-references (not max handle), short header [A][id][u32 stamp][u16 tag], ESEntity schemas incl. 2025 layouts, byte-blob vectors >1MB, ElementHeader records (category/family/ownerView/designOption/bbox) captured separately.
 Semantic layer (rvt_map2.py learn2/evaluate2, train on 7 files, test on 3 unseen across 2022/2024/2026): 68.4% of Revit's non-shared parameters reproduced, 98.7% precision (ElementId 78%, Integer 84%, Double 53%, String 42%).
 Left (all computed by Revit, not stored): Area/Volume/Length (need B-rep/curve evaluation), Pressure Drop/Flow/System names (MEP engine), IfcGUID (derivable from UniqueId), Elevation/Offsets from geometry, Work Plane, etc.
-host1 usage: venv ~/rvt-env, code in ~/rvt-research; monero VM stopped only while jobs ran (restarted).
 
 ## UniqueId / IfcGUID from the file alone (2026-10-11)
 - Episode GUID table = tail of Global/History: entry i (i = 0 newest-first from the end) GUID (little-endian Data1-3) at offset len-21-17*i; table size = max episode index + 1.
@@ -186,7 +184,6 @@ Done: rvt_geometry.py v0 + GEOMETRY_API.md (floors/ceilings extrusions from sket
 Measured: Floor Area 194/289 exact, Perimeter 262/289; Ceiling Area 659/677, Perimeter 677/677 (all years); walls 3 exact/5 approx/1 off of 9 (joins/openings missing).
 Key discovery: saved graphics (channel 103) hold per-element evaluated B-rep (GElement -> Geometry/Face/Edge/EdgeLoop, Plane+CylSurf exact: P=center+R cos(u) xVec+R sin(u) yVec+v zVec; edge firstAndLast = [start,end] each with uv on both adjacent faces). Tools: g103_all.py (index), g103_get.py, rvt_brep.py, rvt_mesh.py (planar+cylinder tessellation, volume), symvol_test.py. Box symbol volume matched exactly (130.896 ft3).
 Open: instance own record has Geometry with many edges (open meshes = unsupported surfaces RuledSurf/SurfRev/cone, missing loops); need instance transform handling, view-condition node selection, then score per class/year. Class status still BOX-ONLY: all FamilyInstance, rooms, stairs, railings, topography, fittings.
-Pending (not started): parameter-gap universal lookup rules + final per-year param table (pout eval running on host1, xcache), perf cheap wins + Rust port, ODA done (quarantined).
 
 ## GEOMETRY STATUS - per-class fidelity (2026-10-11, 7 files: one per year 2020-2026, up to 300 elements per class, saved-graphics meshes via rvt_elemmesh.element_mesh)
 exact = closed mesh whose volume equals Revit's Volume within 1e-4; approx = mesh bbox IoU >= 0.95 with the element's stored Revit bbox (m_bBox); partial = IoU 0.5-0.95; box-only = no mesh / IoU < 0.5.

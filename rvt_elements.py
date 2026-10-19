@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Anchored element extraction from decoded Partitions/NN data (schema-guided, no ODA).
+"""Anchored element extraction from decoded Partitions/NN data (schema-guided).
 Currently: sheets (DBViewDrafting: DBView.m_viewName ... DBViewDrafting.m_sheetNumber..m_issueDate)."""
 import re, struct, sys, os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
