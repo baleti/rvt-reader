@@ -146,6 +146,15 @@ def params(path, geom=None):
                 np_ = oi_['m_numberOfBarPositions']; q_ = np_ - (0 if oi_.get('m_includeFirstBar', 1) else 1) - (0 if oi_.get('m_includeLastBar', 1) else 1)
                 _setp(d, 'Bar Length', 'Double', oi_['m_barLength']); _setp(d, 'Quantity', 'Integer', q_)
                 if isinstance(oi_.get('m_layoutRule'), int): _setp(d, 'Layout Rule', 'Integer', oi_['m_layoutRule'])
+                try:                                           # Model Bar Diameter (2022+) = the bar type's diameter
+                    bt2_ = recs[int(oi_['m_barTypeId'])]['fields']; bd2_ = bt2_.get('m_barModelDiameter', bt2_.get('m_barDiameter'))
+                    if isinstance(bd2_, float): _setp(d, 'Model Bar Diameter', 'Double', bd2_)
+                except Exception: pass
+                try:                                           # bend diameters: the bar type's standard value, or its stirrup/tie value when the shape's style is 1 (rst_basic 2020: 122 of 122)
+                    bt_ = recs[int(oi_['m_barTypeId'])]['fields']; st_ = recs[int(oi_['m_shapeId'])]['fields'].get('m_style')
+                    bd_ = bt_.get('m_stirrupTieBendDiam') if st_ == 1 else bt_.get('m_standardBendDiam')
+                    if isinstance(bd_, float): _setp(d, 'Bend Diameter', 'Double', bd_); _setp(d, 'Standard Bend Diameter', 'Double', bd_)
+                except Exception: pass
                 _setp(d, 'Spacing', 'Double', oi_['m_maxSpacing'] if oi_.get('m_layoutRule') in (2, 3) and isinstance(oi_.get('m_maxSpacing'), float) else 0.0)
                 _setp(d, 'Total Bar Length', 'Double', q_ * oi_['m_barLength'])
         elif c == 'ReferencePoint':                                      # analytical reference points: Associated Level = the level nearest to the point's z, offset = z - level elevation (2023 rst_advanced samples 4/4 exact; unvalidated at scale)
@@ -297,9 +306,33 @@ def params(path, geom=None):
                     if k2_.split('|')[0] == nm_ and isinstance(v2_, float): return v2_
                 return 0.0
             if bl_ is not None and tl_ is not None: _setp(d, 'Unconnected Height', 'Double', (tl_ + _g('Top Offset')) - (bl_ + _g('Base Offset')))
-        if c == 'AnalyticalMember': _setp(d, 'Has Association', 'Integer', 1)          # every analytical member of the 2023+ model is associated with its physical member (600 of 600, rst_advanced 2023)
         elif c == 'FamilyInstance' and any(k_.split('|')[0] == 'Enable Analytical Model' for k_ in d):
-            ea_ = next(v_ for k_, v_ in d.items() if k_.split('|')[0] == 'Enable Analytical Model'); _setp(d, 'Has Association', 'Integer', 1 if ea_ else 0)          # a physical member with its analytical model enabled has an association
+            ea_ = d.get('Enable Analytical Model|Integer')
+            if ea_ is not None: _setp(d, 'Has Association', 'Integer', 1 if ea_ else 0)          # a physical member with its analytical model enabled has an association
+        if c in ('BasicWallType', 'FloorAttributes', 'RoofAttributes', 'CeilingAttributes') and isinstance(f.get('m_pCompoundStructure'), dict):          # compound-structure types: thickness = sum of the layer widths, Structural Material = the structure layer's material
+            cs_ = f['m_pCompoundStructure']; cs_ = cs_.get('obj', cs_)
+            ls_ = cs_.get('m_layers') or []
+            ls_ = [l_ for l_ in ls_ if isinstance(l_, dict) and isinstance(l_.get('m_layerWidth'), float)]
+            if ls_:
+                tot_ = sum(l_['m_layerWidth'] for l_ in ls_)
+                _setp(d, 'Width' if c == 'BasicWallType' else 'Default Thickness', 'Double', tot_)
+                st_ = [l_.get('m_materialId') for l_ in ls_ if l_.get('m_layerFunction') == 1]
+                sm_ = int(st_[0]) if st_ and st_[0] not in _INVALID else -1
+                _setp(d, 'Structural Material', 'ElementId', sm_)
+        if c == 'DBViewType' and isinstance(f.get('m_refLabelStr'), str): _setp(d, 'Default Reference Label', 'String', f['m_refLabelStr'])
+        if c in ('Hub', 'ReferencePoint') and all(v_ is None for k_, v_ in d.items() if k_.split('|')[0] == 'Connection Status'):          # analytical hubs: Connection Status 2 when the connector has two references, else 0 (Residential 2020: 36 of 38)
+            cm3_ = f.get('m_oConnectorManager') or f.get('m_pConnectorManager') or f.get('m_pConnectorMgr')
+            if isinstance(cm3_, dict):
+                cm3_ = cm3_.get('obj', cm3_); ar3_ = cm3_.get('m_connPtrArray') or []
+                nr_ = max([len(((a_.get('obj') if isinstance(a_, dict) else None) or {}).get('m_arrRefs') or []) for a_ in ar3_] or [0])
+                _setp(d, 'Connection Status', 'Integer', 2 if nr_ >= 2 else 0)
+        if c == 'AnalyticalModelColumn':                                 # 2020-2022 analytical columns: Base = m_startReleases, Top = m_endReleases (Commercial 2020 182945: Base Release 1, Mx 0 My 1 Mz 1 / Top Release 1, Mx My Mz 1)
+            for pf_, rk_ in (('Base', 'm_startReleases'), ('Top', 'm_endReleases')):
+                rl_ = f.get(rk_)
+                if isinstance(rl_, dict):
+                    if isinstance(rl_.get('m_releaseType'), int): _setp(d, pf_ + ' Release', 'Integer', rl_['m_releaseType'])
+                    for ax_ in ('Fx', 'Fy', 'Fz', 'Mx', 'My', 'Mz'):
+                        if isinstance(rl_.get('m_' + ax_), int): _setp(d, '%s %s' % (pf_, ax_), 'Integer', rl_['m_' + ax_])
         cm_ = f.get('m_pConnectorManager') or f.get('m_pConnectorMgr')          # MEP section number: the connectors' modifier m_nSection (rme_basic 2020 ducts 425 of 449)
         if isinstance(cm_, dict) and not any(k_.split('|')[0] == 'Section' for k_ in d):
             cm_ = cm_.get('obj') or cm_; secs_ = []
@@ -317,6 +350,10 @@ def params(path, geom=None):
                 k2_ = k_.replace('OmniClass', 'Classification')
                 if k2_ not in d: d[k2_] = d[k_]
             if c == 'RbsElectricalSystem': _setp(d, 'Core Type', 'Integer', 0); _setp(d, 'Circuit State', 'Integer', 0)
+        ac_ = next((v_ for k_, v_ in d.items() if k_.split('|')[0] == 'Assembly Code' and isinstance(v_, str)), None)          # Assembly Description = the description of the Uniformat assembly code (46 codes in the corpus, unambiguous)
+        if ac_ and ac_ in _ASSEMBLY_DESC and not any(k_.split('|')[0] == 'Assembly Description' for k_ in d): _setp(d, 'Assembly Description', 'String', _ASSEMBLY_DESC[ac_])
+        for (c2_, nm2_, stg2_), v2_ in _DEFAULT_PARAMS.items():          # default when the record gave nothing (Revit reports the value 0 for these)
+            if c == c2_ and not any(k_.split('|')[0] == nm2_ for k_ in d): _setp(d, nm2_, stg2_, v2_)
         for (c2_, nm2_, stg2_), v2_ in _CONST_PARAMS.items():          # parameters Revit reports as a constant for the class (>= 97 % of the corpus values; each rule probe-checked)
             if c == c2_ and (nm2_ not in _CONST_FORCE or True): _setp(d, nm2_, stg2_, v2_)
         if _yr_ >= 2026 and d.get('Category|ElementId') == -2001320:          # Revit 2026: a structural framing member's 'Length' is 'System Length' (Snowdon Structural 2026: 942 members, no 'Length')
@@ -347,6 +384,11 @@ def params(path, geom=None):
             for k, v in gp.items():
                 if k in ('Width', 'Height') and cat == -2000023 and o['params'].get(k) not in (None, 0, 0.0): continue       # door sizes from the mesh only when the type gives none
                 if k not in exact: o['params'][k] = v
+    # MEP fittings / accessories: Revit's Area is 0 except for transitions / reducers / conduit bodies (gt4: Pipe 'Elbow/Tee/Bend/Cap/Plug', Duct 'Takeoff/Elbow/Tee/Endcap/Cross/Union', Conduit and Cable tray elbows, valves: 0 of ~25000; Transition / Reducer: all nonzero)
+    for eid, o in list(out.items()):
+        if o['class'] != 'FamilyInstance' or o['params'].get('Category|ElementId') not in (-2008049, -2008010, -2008128, -2008126, -2008055): continue
+        t_ = o['params'].get('Type Id'); fn_ = (out.get(t_) or {}).get('params', {}).get('Family Name') if isinstance(t_, int) else None
+        if isinstance(fn_, str) and not any(w_ in fn_ for w_ in ('Transition', 'Reducer', 'Body')): _setp(o['params'], 'Area', 'Double', 0.0)
     # analytical members take the physical member's Length (FamilyInstance.m_oFamInstUserData.m_analyticalModelId)
     for eid, o in list(out.items()):
         if o['class'] == 'FamilyInstance' and 'Length' in o['params']:
@@ -407,6 +449,19 @@ def params(path, geom=None):
     if not os.environ.get('RVT_NOHOST'): _host_params(out, recs)
     if not os.environ.get('RVT_NORBN'): _rebar_number(out, recs)
     if not os.environ.get('RVT_NOVIEWSHEET'): _view_sheet_params(out, recs)
+    ha_ = any(o_['params'].get('Has Association|Integer', o_['params'].get('Has Association', 0)) == 1 for o_ in out.values() if o_['class'] == 'FamilyInstance')          # 2023+: analytical members are associated when the file's physical members are (rst_advanced 2023: all 1, rst_basic 2023: all 0)
+    for o_ in out.values():
+        if o_['class'] in ('AnalyticalMember', 'AnalyticalPanel'): _setp(o_['params'], 'Has Association', 'Integer', 1 if ha_ else 0)
+    for eid_, o_ in out.items():                                      # AnalyticalMember Physical Material Asset = name of the structural asset (PropertySetElement) of its material
+        if o_['class'] != 'AnalyticalMember': continue
+        try:
+            mid_ = recs[eid_]['fields'].get('m_materialId'); mt_ = recs[int(mid_)]['fields'].get('m_pMaterial'); mt_ = mt_.get('obj', mt_)
+            for s_ in ((mt_ or {}).get('m_assetMap') or {}).get('m_sharedAssetIdMap') or []:
+                if (((s_.get('first') or {}).get('m_value') or {}).get('m_guid')) == '2df6c9ede4489e4aabb922c8664c012c':
+                    nm_ = out.get(_sid(s_.get('second')), {}).get('params', {}).get('Name')
+                    if isinstance(nm_, str): _setp(o_['params'], 'Physical Material Asset', 'String', nm_)
+                    break
+        except Exception: pass
     if _yr_ >= 2025:                                                  # Revit 2025+ view / viewport parameters that are constant -1 (Sheet Collection, Referencing Sheet Collection) and, from 2026, Saved Position -1 / View Anchor 0
         for o_ in out.values():
             pp_ = o_['params']
@@ -414,6 +469,28 @@ def params(path, geom=None):
                 _setp(pp_, 'Sheet Collection', 'ElementId', -1)
                 if any(k_.split('|')[0] == 'Referencing Sheet' for k_ in pp_): _setp(pp_, 'Referencing Sheet Collection', 'ElementId', -1)
                 if _yr_ >= 2026: _setp(pp_, 'Saved Position', 'ElementId', -1); _setp(pp_, 'View Anchor', 'Integer', 0)
+    try:                                                              # view Family / Type strings (GT ids -1139999 Family, -1012109 plural, -1139997 Type, -1139998 'Family: Type', -1012106 'Plurals (Type)'): from the view type's m_systemFamilyIdx
+        for eid_, o_ in out.items():
+            c_ = o_['class']
+            if not (c_.startswith('DBView') or c_ in ('PanelScheduleView', 'View3d')) or c_ == 'DBViewAnonDrafting': continue          # viewports / anonymous drafting views already carry the stored strings
+            v_ = eid_
+            if c_ == 'Viewport':
+                v_ = recs[eid_]['fields'].get('m_dbViewId'); v_ = int(v_) if v_ not in _INVALID else None
+                if v_ not in out: continue
+            tid_ = recs[v_]['fields'].get('m_dbViewTypeId')
+            tid_ = int(tid_) if tid_ not in _INVALID else None
+            if not isinstance(tid_, int) or tid_ not in recs or recs[tid_]['class'] != 'DBViewType': continue
+            fam_ = _VIEW_FAMILY.get(recs[tid_]['fields'].get('m_systemFamilyIdx'))
+            tn_ = out.get(tid_, {}).get('params', {}).get('Name')
+            if not isinstance(tn_, str): tn_ = _VIEW_TYPE_DEFAULT.get(recs[tid_]['fields'].get('m_systemFamilyIdx'))          # the type's own name is not in the record: the system default name (custom-named view types stay unresolved)
+            if not fam_: continue
+            pl_ = fam_ + 's'; pp_ = o_['params']
+            if any(isinstance(pp_.get(k_), str) and not k_.endswith(('-1139999', '-1012109', '-1139997', '-1139998', '-1012106')) for k_ in ('Family and Type', 'Family and Type|String')): continue          # a stored string (viewports, drafting views) is already right
+            pp_['Family|String|-1139999'] = fam_; pp_['Family|String|-1012109'] = pl_
+            if isinstance(tn_, str):
+                pp_['Type|String|-1139997'] = tn_; pp_['Family and Type|String|-1139998'] = fam_ + ': ' + tn_; pp_['Family and Type|String|-1012106'] = pl_ if tn_ == fam_ else '%s (%s)' % (pl_, tn_)
+    except Exception as ex_:
+        if os.environ.get('RVT_DEBUG'): print('viewfam error', repr(ex_))
     if not os.environ.get('RVT_NOVIEWCLIP'):
         try:
             import rvt_viewdisp as VD
@@ -573,10 +650,19 @@ def params(path, geom=None):
         if isinstance(v_, str) and 'Level|ElementId' not in o_['params'] and len(lvn.get(v_, ())) == 1: o_['params']['Level|ElementId'] = lvn[v_][0]
     return out
 
+_DEFAULT_PARAMS = {('SketchGrid', 'Work Plane Grid Spacing', 'Double'): -1.0, ('SWall', 'Location Line Offset', 'Double'): 0.0, ('WallSweep', 'Offset From Level', 'Double'): 0.0,
+                   ('RoomElem', 'Actual Power Load per area', 'Double'): 0.0, ('RoomElem', 'Actual Lighting Load per area', 'Double'): 0.0, ('RoomElem', 'Calculated Heating Load per area', 'Double'): 0.0, ('RoomElem', 'Calculated Cooling Load per area', 'Double'): 0.0, ('RoomElem', 'Calculated Supply Airflow per area', 'Double'): 0.0, ('RoomElem', 'Occupancy Unit', 'Integer'): 0,
+                   ('FamilySymbol', 'Analytic Construction', 'String'): '<None>', ('FamilySymbol', 'CWFU', 'Double'): 0.0, ('FamilySymbol', 'WFU', 'Double'): 0.0, ('FamilySymbol', 'HWFU', 'Double'): 0.0, ('FamilySymbol', 'Apparent Load', 'Double'): 0.0}
+
+try: _ASSEMBLY_DESC = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'assembly_desc.json')))
+except Exception: _ASSEMBLY_DESC = {}
 _CONST_FORCE = set()
 _CONST_PARAMS = {('RbsWireCurve', 'Export to IFC', 'Integer'): 0, ('SpotElevation', 'Display Elevations', 'Integer'): 1,
                  ('DuctFittingCenterLine', 'Lining Thickness', 'Double'): 0.0, ('DuctFittingCenterLine', 'Insulation Thickness', 'Double'): 0.0, ('SegmentCenterLine', 'Lining Thickness', 'Double'): 0.0,
                  ('Viewer3d', 'Parts Visibility', 'Integer'): 1, ('AngularDim', 'Label', 'ElementId'): -1}
+
+_VIEW_TYPE_DEFAULT = {102: '3D View', 104: 'Rendering', 105: 'Schedule', 107: 'Sheet', 108: 'Drafting View', 109: 'Floor Plan', 111: 'Ceiling Plan', 113: 'Detail', 114: 'Building Elevation', 117: 'Legend', 119: 'Graphical Column Schedule', 120: 'Structural Plan'}
+_VIEW_FAMILY = {102: '3D View', 104: 'Rendering', 105: 'Schedule', 107: 'Sheet', 108: 'Drafting View', 109: 'Floor Plan', 111: 'Ceiling Plan', 112: 'Section', 113: 'Detail View', 114: 'Elevation', 117: 'Legend', 119: 'Graphical Column Schedule', 120: 'Structural Plan'}          # DBViewType.m_systemFamilyIdx -> view family (2020 Commercial + rst_basic, 100 % consistent)
 
 _INVALID = (None, 0xFFFFFFFF, 0xFFFFFFFFFFFFFFFF)
 def _setp(d, nm, stg, v):
