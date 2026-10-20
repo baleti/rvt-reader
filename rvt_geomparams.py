@@ -113,6 +113,9 @@ def geom_params(doc, eid, f, cat, cls='FamilyInstance'):
         if m3 is not None:
             v3, c3, _a3, _ = M.volume_by_node(m3['tris'], m3.get('meta'), m3['nid'], fid=m3.get('fid'))
             if c3 and v3 > 0: vol, closed = v3, c3
+    if not closed and vol > 0 and cls == 'FamilyInstance' and m.get('source') == 'symbol_instance' and not os.environ.get('RVT_NOBREPCLOSED'):
+        try: closed = EM.brep_topology_closed(doc, eid, vd_)          # topologically closed B-rep whose mesh does not weld (sampling mismatch): the refined volume is exact
+        except Exception: pass
     if closed and vol > 0: out['Volume'] = float(vol)
     if cls != 'FamilyInstance': return out
     if cat == CAT_PANEL:
