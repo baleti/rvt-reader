@@ -930,7 +930,7 @@ def heal_open(tris, tol=5e-5):
     return out, caps, True
 
 
-def tjunction_closed(tris, tol=5e-5):
+def tjunction_closed(tris, tol=5e-5, near=4e-3):
     """geometric watertightness (orientation-free): boundary edges are split at boundary vertices that lie on them (T-junctions between faces sampled differently); closed when every piece then occurs an even number of times"""
     key = lambda p: (round(p[0] / tol), round(p[1] / tol), round(p[2] / tol))
     pts = {}; ec = collections.Counter()
@@ -953,7 +953,7 @@ def tjunction_closed(tris, tol=5e-5):
         for u_, v_ in zip(chain, chain[1:]): out[(min(u_, v_), max(u_, v_))] += 1
     if all(c % 2 == 0 for c in out.values()): return True
     # curved boundary sampled differently on the two sides: chord/arc deviation only - every unmatched piece must lie within `near` of the other unmatched pieces
-    near = 4e-3; segs = [(P[a], P[b]) for (a, b), c in out.items() if c % 2]
+    segs = [(P[a], P[b]) for (a, b), c in out.items() if c % 2]
     if len(segs) > 2000: return False
     A = np.array([x[0] for x in segs]); B = np.array([x[1] for x in segs]); D = B - A; L2 = np.maximum((D * D).sum(1), 1e-18)
     for i, (p, q) in enumerate(segs):

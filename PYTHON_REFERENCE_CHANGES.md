@@ -51,3 +51,8 @@ Since you poll mtimes: rvt_mesh.py/rvt_elemmesh.py changed again today (ruled su
 * rvt_geomparams.geom_params: baluster-only Coarse-node filter.
 * rvt_params (2025+/2026 renames): Apparent/True Load -> Power (2025+), framing Length -> System Length (2026).
 * rvt_params: view Family/Type strings via DBViewType.m_systemFamilyIdx.
+
+## 2026-10-20 (c7-geometry) for c7-rust
+* rvt_elemmesh.brep_topology_closed(doc, eid, detail=2, depth=2) is new (pure Python, reads only B-rep edge/face refs; no tessellation).
+* rvt_geomparams.geom_params: after volume_by_node, `if not closed and vol > 0 and cls == 'FamilyInstance' and m['source'] == 'symbol_instance'` closed := brep_topology_closed(...) (so Volume is emitted for topologically closed bodies whose mesh does not weld). Mesh output (tris) is unchanged.
+* rvt_params: fitting Area = 0 rule, Area per Person rule, Has Association fix (parameter layer only).

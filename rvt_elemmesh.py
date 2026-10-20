@@ -252,6 +252,32 @@ def _element_mesh0(doc, eid, symbol_depth=2, detail=3):
         t = M.tessellate_geometry(g); allmat += _tri_mats(doc, t, g); allt += t['tris']; allm += t['meta']; alln += [gi_] * len(t['tris']); allf += [gi_ * 100000 + f_ for f_ in t['fidx']]; un += t['unsupported']
     return {'mat': allmat, 'tris': allt, 'fid': allf, 'nid': alln, 'meta': allm, 'source': 'all_geometry', 'flags': flags + (['unsupported_faces'] if un else []), 'bbox': bb}
 
+def brep_topology_closed(doc, eid, detail=2, depth=2):
+    """topological closure of an element's saved B-rep: True when it has Geometry nodes (own or through its symbol instances) and in every node each edge is used by exactly two faces.
+    Independent of how the faces were sampled: a mesh that does not weld (planar end faces and cylinders sampling a shared arc differently) is still the closed solid Revit measures
+    (Snowdon HVAC grilles: 404 open meshes, refined volume 0.08716 vs Revit 0.08718)"""
+    rec = doc.rec(eid)
+    if rec is None: return False
+    geos, inst = _geos_f(rec['fields'], detail)
+    if not geos and not inst: geos, inst = _geos(rec['fields'])
+    nodes = 0
+    for g in geos:
+        ed = M._edge_map(g)
+        if not ed or not g.get('m_pFaces'): return False
+        for e in ed.values():
+            rf = [r.get('ref') if isinstance(r, dict) else r for r in (e.get('m_pFace') or [])]
+            if len([x for x in rf if x is not None]) != 2: return False
+        nodes += 1
+    if depth > 0:
+        for z in inst:
+            sid = _ob(z['m_instanceInfo']).get('m_symbolId')
+            if sid is None: continue
+            if doc.cls(int(sid)) == 'FamilyInstance': continue
+            r = brep_topology_closed(doc, int(sid), detail, depth - 1)
+            if not r: return False
+            nodes += 1
+    return nodes > 0
+
 def end_cap_profile(tris, tol=1e-5):
     """Cross-section of a prismatic element from its mesh: the two largest planar groups whose normal is parallel to the element's main axis.
     returns {'axis':[..], 'caps':[{'origin','xvec','yvec','loops':[[[x,y],...]], 'area'}]} (loops in the cap plane coordinates) or None"""
