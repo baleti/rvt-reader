@@ -993,6 +993,8 @@ def _fan_uv(kind, ev, uv, n):
     T = np.array(out, float)
     return T
 
+_VOLSTEP = float(os.environ.get('RVT_VOLSTEP', '0.1'))          # max uv step (rad) of a curved sub-triangle in volume integration
+
 def refined_volume(tris, meta, levels=3, tol=5e-5, centroid=False, fid=None):
     """volume of a closed shell with curved faces: orientation from the coarse closed mesh (shared boundary vertices), then every curved
     coarse triangle is subdivided in (u,v) and mapped through its surface; sub-triangles keep the orientation of their coarse parent.
@@ -1093,7 +1095,7 @@ def refined_volume(tris, meta, levels=3, tol=5e-5, centroid=False, fid=None):
                         u_ = float(uv[0][0]); va = float(uv[:, 1].min()); vb = float(uv[:, 1].max()); pa = np.asarray(ev(u_, va)); pb = np.asarray(ev(u_, vb)); pm = np.asarray(ev(u_, (va + vb) / 2))
                         if np.linalg.norm(pm - (pa + pb) / 2) > 1e-6 * max(1.0, np.linalg.norm(pb - pa)): du = max(du, dv)
                     except Exception: pass
-            lv = int(min(5, max(1, math.ceil(math.log2(max(du, 1e-9) / 0.1)))))
+            lv = int(min(6, max(1, math.ceil(math.log2(max(du, 1e-9) / _VOLSTEP)))))
         else: lv = levels + 1
         T = uv[None, :, :]
         fan = _fan_uv(kind, ev, uv, 2 ** lv) if kind == 'ruled' else None
