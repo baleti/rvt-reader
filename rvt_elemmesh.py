@@ -222,6 +222,9 @@ def _element_mesh0(doc, eid, symbol_depth=2, detail=3):
                 own = [t for p in per for t in p[0]]; ownm = [m for p in per for m in p[1]]; ownf = [f for p in per for f in p[2]]; ownn = [p[3] for p in per for _ in p[0]]; flags = flags + ['closed_shell', 'per_node']
             else:
                 st, sm, ok = M.select_closed_shell(own, ownm, ownf, prio=ownp)
+                if ok and not os.environ.get('RVT_NOSTACKED'):                  # stacked closed segments (flex duct): the shared caps cancel and the whole chain is the body, not one segment
+                    dp_ = M.coincident_plane_pairs(own, ownm, ownf)
+                    if dp_ and M.nearly_closed([t_ for t_, f_ in zip(own, ownf) if f_ not in dp_]): ok = False
                 if ok: own, ownm = st, sm; ownn = [0] * len(own); ownf = list(M.select_closed_shell.last_fidx); flags = flags + ['closed_shell']
         xt = []; xm = []; xn = []; xf = []; xmat = []
         if inst and symbol_depth > 0:                                  # the element also instantiates other symbols (e.g. a stair railing's balusters next to its rods)

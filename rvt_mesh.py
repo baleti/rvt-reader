@@ -1221,6 +1221,15 @@ def select_closed_shell(tris, meta, fidx, tol=5e-5, prio=None):
     return out_t, out_m, True
 
 
+def coincident_plane_pairs(tris, meta, fid):
+    """face ids of planar faces that occur exactly twice with the same corner set (the shared cap of two stacked closed segments)"""
+    sg = collections.defaultdict(list)
+    for j, f in enumerate(fid): sg[f].append(j)
+    fsig = {}
+    for f, js in sg.items():
+        if all(meta[j][0] == 'plane' for j in js): fsig.setdefault(frozenset(tuple(int(round(x / 5e-5)) for x in p) for j in js for p in tris[j]), []).append(f)
+    return {f for fs in fsig.values() if len(fs) == 2 for f in fs}
+
 def volume_by_node(tris, meta, nid, levels=3, centroid=False, fid=None):
     """volume of an assembly: every Geometry node (body) is oriented and measured on its own (touching bodies make shared edges non-manifold in a joint mesh).
     returns (volume, closed_all, area, n_nodes)"""
@@ -1231,8 +1240,18 @@ def volume_by_node(tris, meta, nid, levels=3, centroid=False, fid=None):
         if n >= 10**9: continue                                  # faceted meshes (GPolyMesh: clearance boxes, terrain TINs) are not solids of the element: no volume/area
         t = [tris[i] for i in idx]
         m = [meta[i] for i in idx] if meta and len(meta) == len(tris) else None
+        fd_ = [fid[i] for i in idx] if fid is not None else None
+        dup_a = 0.0
+        if m and fd_ is not None and not os.environ.get('RVT_NOSTACKED'):
+            # stacked segments (flex duct: one closed shell per section, neighbouring sections share a coincident cap pair): the pair bounds no volume of the whole; drop both caps for the volume, the surface keeps them (Revit's Area counts them)
+            drop_ = coincident_plane_pairs(t, m, fd_)
+            if drop_:
+                keep_ = [j_ for j_, f_ in enumerate(fd_) if f_ not in drop_]
+                for j_, f_ in enumerate(fd_):
+                    if f_ in drop_: a0_, b0_, c0_ = [np.asarray(x, float) for x in t[j_]]; dup_a += 0.5 * float(np.linalg.norm(np.cross(b0_ - a0_, c0_ - a0_)))
+                t = [t[j_] for j_ in keep_]; m = [m[j_] for j_ in keep_]; fd_ = [fd_[j_] for j_ in keep_]
         if m and all(ev is not None or k == 'plane' for k, ev, _ in m):
-            try: v, c, a, cc = refined_volume(t, m, levels=levels, centroid=True, fid=[fid[i] for i in idx] if fid is not None else None)
+            try: v, c, a, cc = refined_volume(t, m, levels=levels, centroid=True, fid=fd_)
             except Exception: v, c, _, a = mesh_volume(t); cc = _mesh_centroid(t)
         else:
             v, c, _, a = mesh_volume(t); cc = _mesh_centroid(t)
@@ -1247,6 +1266,7 @@ def volume_by_node(tris, meta, nid, levels=3, centroid=False, fid=None):
                 v2, c2, _, a2 = mesh_volume(t2)
                 if c2: v, c, a = v2, True, a2
         else: closed_keys |= {tuple(int(round(x / 5e-5)) for x in p) for tr in t for p in tr}
+        a += dup_a
         if not c and nearly_closed(t, 0.12, 40): c = True       # a handful of unmatched boundary edges (sampling mismatch on trimmed curved faces, terrain) does not change the volume
         if not c: closed_all = False
         vol += v; area += a; csum += v * np.asarray(cc)
