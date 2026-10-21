@@ -9,7 +9,7 @@ Own analysis, validated against Revit's parameter dumps (gt4/*.tsv):
   (local x / local y of the instance transform) when the face is a rectangle, else 0 (Revit reports 0 for non-rectangular panels).
 * Mullions: Length = extent of the solid along the instance's local axis that is longest.
 usage: geom_params(doc, eid, fields, category_id) -> {name: value}; doc = rvt_elemmesh.Doc(file)."""
-import collections
+import collections, os
 import numpy as np
 import rvt_elemmesh as EM, rvt_mesh as M
 
@@ -80,6 +80,8 @@ def host_params(doc, eid, cls):
     out = {}
     v, closed, _, _ = M.volume_by_node(m['tris'], m.get('meta'), m['nid'], fid=m.get('fid'))
     if closed and v > 0: out['Volume'] = float(v)
+    if cls == 'Floor' and m['tris'] and not os.environ.get('RVT_NOELEV'):          # floors: Elevation at Top / Bottom = the solid's highest / lowest z (2020 rst_basic / rme_basic / Commercial, Snowdon Structural 2024: 78 of 78 flat floors; floors Revit reports 0 for, 10 of 88, stay wrong)
+        Zf = np.array(m['tris'], float).reshape(-1, 3)[:, 2]; out['Elevation at Top'] = float(Zf.max()); out['Elevation at Bottom'] = float(Zf.min())
     if 'Area' in HOSTS[cls]:
         T = np.array(m['tris'], float); a = 0.5 * np.linalg.norm(np.cross(T[:, 1] - T[:, 0], T[:, 2] - T[:, 0]), axis=1); fa = collections.Counter()
         for i, fi in enumerate(m['fid']): fa[fi] += a[i]
@@ -153,6 +155,9 @@ def geom_params(doc, eid, f, cat, cls='FamilyInstance'):
                 if l_ > 1e-9:
                     t_ = (np.array(m['tris'], float).reshape(-1, 3) - p0_) @ (d_ / l_); out['Cut Length'] = float(t_.max() - t_.min())
         except Exception: pass
+    if cat in (-2001300, -2001320, -2001330) and not os.environ.get('RVT_NOELEV'):          # columns / framing: Revit's Elevation at Top / Bottom = the solid's highest / lowest z (rst_basic / rst_advanced 2020-2022 where the stored slot is absent: 372 of 380 exact)
+        Z = np.array(m['tris'], float).reshape(-1, 3)[:, 2]
+        if len(Z): out['Elevation at Top'] = float(Z.max()); out['Elevation at Bottom'] = float(Z.min())
     if cat == CAT_MULLION:
         tr = _trf(f)
         if tr is not None:
