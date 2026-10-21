@@ -94,3 +94,5 @@ Known approximate: Rebar Total Bar Length / Reinforcement Volume (about 0.03% of
 
 Update 2026-10-19: new `rvt_viewdisp.view_clip(file)` (section / elevation far clip offset, far-clip active, Far Clipping enum, crop active, bounded-space frame; verified 2020-2026 against Revit parameters) next to `view_display`; fidelity table of record: FID_TABLE_FINAL.txt + fid-campaign/RESULTS.md (r1: FamilyInstance 99.8%, SWall 99.2%, RoomElem 99.4%, all other classes >= 99.9%).
 Update 2026-10-20: parameter fidelity run par35 = 96.2% exact of 8.98M values (2020 96.5 ... 2026 94.5); table PARAM_TABLE_c35.txt, NOTES.md.
+
+Parameters (2026-10-21): rvt_params.params reproduces 96.2% of Revit's 8,976,010 parameter values exactly over all 60 gt4 files (run #5; table PARAM_REPORT_c35.txt; 94.9% before, ~70% at the start).
