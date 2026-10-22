@@ -158,6 +158,12 @@ def geom_params(doc, eid, f, cat, cls='FamilyInstance'):
     if cat in (-2001300, -2001320, -2001330) and not os.environ.get('RVT_NOELEV'):          # columns / framing: Revit's Elevation at Top / Bottom = the solid's highest / lowest z (rst_basic / rst_advanced 2020-2022 where the stored slot is absent: 372 of 380 exact)
         Z = np.array(m['tris'], float).reshape(-1, 3)[:, 2]
         if len(Z): out['Elevation at Top'] = float(Z.max()); out['Elevation at Bottom'] = float(Z.min())
+        if cat == -2001320 and not os.environ.get('RVT_NOSLOPEELEV'):          # sloped framing (braces): Revit reports 0 / 0 (2023 rst_advanced 132740, 24 members)
+            try:
+                import rvt_geometry as RG2, rvt_geom as Gm3
+                cu2_ = Gm3.primary_curve(f); sd2_ = RG2.seg_dict(cu2_) if cu2_ is not None else None
+                if sd2_ and sd2_['type'] == 'line' and abs(sd2_['p1'][2] - sd2_['p0'][2]) > 1e-4: out['Elevation at Top'] = 0.0; out['Elevation at Bottom'] = 0.0
+            except Exception: pass
     if cat == CAT_MULLION:
         tr = _trf(f)
         if tr is not None:
