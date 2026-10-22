@@ -100,7 +100,7 @@ def geom_params(doc, eid, f, cat, cls='FamilyInstance'):
                 if ni < 2 * 10**7: fa[fi] += a[i]
             if fa: out['Area'] = float(max(fa.values()))
         return out
-    vd_ = 2 if cat == -2008234 else volume_detail(doc)          # Plumbing Equipment follows Medium even in 2026 files (Snowdon Plumbing 2026: 15 of 15 Medium, 0 of 15 Fine; 2024 identical)
+    vd_ = 2 if cat in (-2008234, -2001160) else volume_detail(doc)          # Plumbing Equipment follows Medium even in 2026 files (Snowdon Plumbing 2026: 15 of 15 Medium, 0 of 15 Fine; 2024 identical); Plumbing Fixtures (-2001160) too: Medium 0.03972 vs Revit 0.03975, Fine 0.07297 (1371837, Plumbing 2026)
     m = _mesh(doc, eid, vd_)
     if m is None: return {'Volume': 0.0, 'Area': 0.0} if cls == 'FamilyInstance' and cat not in (CAT_PANEL,) else out
     if cls == 'FamilyInstance' and m.get('source') == 'symbol_instance' and cat in _FORM_NODE_CATS: m = _drop_form_nodes(doc, eid, m, vd_)
