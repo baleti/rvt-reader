@@ -202,4 +202,10 @@ def room_params(doc, eid):
                     if j not in seen: seen.add(j); stack.append(j)
         loops.append(L)
     per = max(loops) if loops else 0.0                                # Revit's Perimeter is the outer boundary only (islands / columns excluded: Arch_Link 2023, 223193: 55.54 vs 58.68 with a 3.14 column)
-    return {'Area': float(ln[bot].sum() / 2), 'Perimeter': per}
+    res = {'Area': float(ln[bot].sum() / 2), 'Perimeter': per}
+    if not os.environ.get('RVT_NOROOMVOL'):                           # Revit's Volume = the room solid's volume (rme_basic 2020: 162 of 165 rooms / spaces within 2%)
+        try:
+            v_, closed_, _a, _x = M.volume_by_node(m['tris'], m.get('meta'), m['nid'], fid=m.get('fid'))
+            if closed_ and v_ > 0: res['Volume'] = float(v_)
+        except Exception: pass
+    return res
