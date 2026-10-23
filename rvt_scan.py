@@ -18,9 +18,11 @@ def load(path):
     cls, _ = fp.parse(inflate_stream(o.openstream('Formats/Latest').read())[1])
     et = inflate_stream(o.openstream('Global/ElemTable').read())[1]
     idsize = id_size(cls)
-    if idsize == 4: ids = {struct.unpack_from('<I', et, 6 + 28 * k)[0] for k in range((len(et) - 6) // 28)}
+    nh = struct.unpack_from('<I', et, 2)[0]                                   # header row count: a second table follows the element rows in real office files (bm3reader 2026-10-23)
+    if idsize == 4: ids = {struct.unpack_from('<I', et, 6 + 28 * k)[0] for k in range(min(nh, (len(et) - 6) // 28) if nh else (len(et) - 6) // 28)}
     else:
         n = (len(et) - 6) // 40
+        if 0 < nh <= n: n = nh
         ids = {struct.unpack_from('<Q', et, 6 + 40 * k)[0] for k in range(n)}
         # elements without their own ElemTable row (sketch lines, floors/sketches inside parents) are referenced at row offset +20
         top = max(ids) + 16
@@ -106,11 +108,11 @@ def owners(path):
     import olefile
     from rvtfmt import inflate_stream
     o = olefile.OleFileIO(path); cls, _ = fp.parse(inflate_stream(o.openstream('Formats/Latest').read())[1]); W = id_size(cls)
-    et = inflate_stream(o.openstream('Global/ElemTable').read())[1]; out = {}
+    et = inflate_stream(o.openstream('Global/ElemTable').read())[1]; out = {}; nh = struct.unpack_from('<I', et, 2)[0]
     if W == 4:
-        for k in range((len(et) - 6) // 28):
+        for k in range(min(nh, (len(et) - 6) // 28) if nh else (len(et) - 6) // 28):
             r = struct.unpack_from('<7I', et, 6 + 28 * k); out[r[0]] = None if r[6] == 0xffffffff else r[6]
     else:
-        for k in range((len(et) - 6) // 40):
+        for k in range(min(nh, (len(et) - 6) // 40) if nh else (len(et) - 6) // 40):
             i = struct.unpack_from('<Q', et, 6 + 40 * k)[0]; ow = struct.unpack_from('<Q', et, 6 + 40 * k + 28)[0]; out[i] = None if ow == 0xffffffffffffffff else ow
     return out
