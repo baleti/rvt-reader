@@ -98,6 +98,8 @@ class Dec:
                 return out, p
             if fl in (1, 2, 3):                   # pointer slot
                 return s.slot(b, p, fl, pend, path)
+            if fl == 4 and not os.environ.get('RVT_NOFL4'):   # 2014-2017: flag 4 = nullable pointer slot (VarParam.m_pSubst), bm3fam 2026-10-23
+                return s.slot(b, p, 1, pend, path)
             ref = (ref or 0) & 0x7fff
             if fl == 0x50:                        # vector of embedded structs
                 n = struct.unpack_from('<I', b, p)[0]; p += 4
