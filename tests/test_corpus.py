@@ -8,13 +8,17 @@ class Ctx:
 # 1. empty mesh + stored bbox + symbol_no_graphics -> box; without the flag stays None
 G._docs['synthetic.rvt'] = object()                                          # no real Doc needed
 rec={'class':'BaseRailing','fields':{}}
+_orig_mesh_geometry = G._mesh_geometry
 EM.element_mesh = lambda d, e: {'tris': [], 'flags': ['symbol_no_graphics'], 'bbox': [[0, 0, 0], [0.25, 16, 0.16]]}
-r = G._mesh_geometry('synthetic.rvt', 7, rec)
+assert G._mesh_geometry('synthetic.rvt', 7, rec) is None                   # not allowed unless element_geometry asks (builder gave nothing)
+r = G._mesh_geometry('synthetic.rvt', 7, rec, allow_box=True)
 assert r and r['confidence'] == 'box' and r['bbox'] == [[0, 0, 0], [0.25, 16, 0.16]] and 'symbol_no_graphics' in r['flags'], r
 EM.element_mesh = lambda d, e: {'tris': [], 'flags': [], 'bbox': [[0, 0, 0], [1, 1, 1]]}
-assert G._mesh_geometry('synthetic.rvt', 7, rec) is None                       # e.g. unbounded room: still no geometry
+assert G._mesh_geometry('synthetic.rvt', 7, rec, allow_box=True) is None   # no symbol_no_graphics flag (e.g. unbounded room): still no geometry
 EM.element_mesh = lambda d, e: {'tris': [], 'flags': ['symbol_no_graphics'], 'bbox': [[0, 0, 0], [0, 0, 0]]}
-assert G._mesh_geometry('synthetic.rvt', 7, rec) is None                       # degenerate bbox: no box
+assert G._mesh_geometry('synthetic.rvt', 7, rec, allow_box=True) is None   # degenerate bbox: no box
+EM.element_mesh = lambda d, e: {'tris': [], 'flags': ['symbol_no_graphics'], 'bbox': [[0, 0, 0], [1, 1, 1]]}
+assert G._mesh_geometry('synthetic.rvt', 7, {'class': 'FamilyInstance', 'fields': {}}, allow_box=True) is None   # other classes (groups, imports, family instances) keep their old answer
 # 2. SWall: parametric 'approx' is replaced by a closed-shell mesh, kept when the mesh is not closed
 swall = {'class': 'SWall', 'fields': {}}
 G.get_ctx = lambda f: Ctx({9: swall})
@@ -23,6 +27,15 @@ G._mesh_geometry = lambda f, e, rc: G._res(None, e, rc, 'mesh_approx', [], ['sav
 assert G.element_geometry('synthetic.rvt', 9)['confidence'] == 'mesh_approx'
 G._mesh_geometry = lambda f, e, rc: G._res(None, e, rc, 'mesh_approx', [], ['saved_graphics_tessellation'])
 assert G.element_geometry('synthetic.rvt', 9)['confidence'] == 'approx'          # mesh not a closed shell: parametric wall stays
+# 2b. a builder's own box (symbol outline) is never replaced by the bbox-only fallback; with no builder the fallback answers for railings
+G._mesh_geometry = _orig_mesh_geometry
+G.get_ctx = lambda f: Ctx({11: {'class': 'BaseRailing', 'fields': {}}})
+EM.element_mesh = lambda d, e: {'tris': [], 'flags': ['symbol_no_graphics'], 'bbox': [[0, 0, 0], [0.25, 16, 0.16]]}
+G.BUILDERS = dict(G.BUILDERS); G.BUILDERS['BaseRailing'] = lambda c, e, r_: G._res(c, e, r_, 'box', [{'kind': 'box', 'min': [0, 0, 0], 'max': [1, 1, 1]}], ['symbol_outline_only'])
+assert G.element_geometry('synthetic.rvt', 11)['flags'] == ['symbol_outline_only']
+del G.BUILDERS['BaseRailing']
+r = G.element_geometry('synthetic.rvt', 11)
+assert r['confidence'] == 'box' and 'bbox_only' in r['flags'], r
 # 3+4. design options
 recs = {0: {'class': 'DesignOption', 'fields': {}},
         100: {'class': 'DesignOption', 'fields': {'m_strName': 'Empty', 'm_DesignOptionSetId': 99}},
@@ -31,7 +44,8 @@ recs = {0: {'class': 'DesignOption', 'fields': {}},
         5: {'class': 'ProjectPhase', 'fields': {'m_name': 'New Construction'}},
         6: {'class': 'SWall', 'fields': {'m_designOptionId': 101}},
         7: {'class': 'SWall', 'fields': {'m_designOptionId': 0xFFFFFFFF}},
-        8: {'class': 'SWall', 'fields': {'m_designOptionId': 0xFFFFFFFFFFFFFFFF}}}
+        8: {'class': 'SWall', 'fields': {'m_designOptionId': 0xFFFFFFFFFFFFFFFF}},
+        9: {'class': 'SWall', 'fields': {'m_designOptionId': 0xFFFFFFFC}}}
 class C2(Ctx):
     pass
 # ctx.recs keyed like the real index: eid -> {'class','fields'}
@@ -45,5 +59,5 @@ assert 0 in G.file_geometry_index('synthetic.rvt')                              
 G.get_ctx = lambda f: C2(recs)
 do = G.design_options('synthetic.rvt')
 assert set(do) == {100, 101} and do[100]['main'] and not do[101]['main'] and do[101]['set_name'] == 'Set A' and do[100]['name'] == 'Empty', do
-assert G.design_option('synthetic.rvt', 6) == 101 and G.design_option('synthetic.rvt', 7) is None and G.design_option('synthetic.rvt', 8) is None
+assert G.design_option('synthetic.rvt', 6) == 101 and G.design_option('synthetic.rvt', 7) is None and G.design_option('synthetic.rvt', 8) is None and G.design_option('synthetic.rvt', 9) is None
 print('ok')
