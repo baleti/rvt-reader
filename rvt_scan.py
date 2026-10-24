@@ -18,7 +18,7 @@ def load(path):
     cls, _ = fp.parse(inflate_stream(o.openstream('Formats/Latest').read())[1])
     et = inflate_stream(o.openstream('Global/ElemTable').read())[1]
     idsize = id_size(cls)
-    nh = struct.unpack_from('<I', et, 2)[0]                                   # header row count: a second table follows the element rows in real office files (bm3reader 2026-10-23)
+    nh = struct.unpack_from('<I', et, 2)[0]                                   # header row count: a second table follows the element rows in real office files (corpus 2026-10-23)
     if idsize == 4: ids = {struct.unpack_from('<I', et, 6 + 28 * k)[0] for k in range(min(nh, (len(et) - 6) // 28) if nh else (len(et) - 6) // 28)}
     else:
         n = (len(et) - 6) // 40

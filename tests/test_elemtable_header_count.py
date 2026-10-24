@@ -1,4 +1,4 @@
-# regression (bm3reader 2026-10-23): element_worksets must stop at the ElemTable header row count; a second table follows in real office files. Synthetic table, no files.
+# regression (corpus 2026-10-23): element_worksets must stop at the ElemTable header row count; a second table follows in real office files. Synthetic table, no files.
 import sys, os, struct; sys.path.insert(0, os.path.expanduser('~/rvt-research'))
 import rvt_worksets as W
 rows = b''.join(struct.pack('<7I', i, i, 0, 1, 1, 0, 0xffffffff)[:24] + struct.pack('<I', 7) for i in range(1, 11))    # 10 rows of 28 bytes, workset word 7 at +24

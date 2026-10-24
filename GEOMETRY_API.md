@@ -97,7 +97,7 @@ Update 2026-10-20: parameter fidelity run par35 = 96.2% exact of 8.98M values (2
 
 Parameters (2026-10-21): rvt_params.params reproduces 96.2% of Revit's 8,976,010 parameter values exactly over all 60 gt4 files (run #5; table PARAM_REPORT_c35.txt; 94.9% before, ~70% at the start).
 
-## Design options (added by bm3reader, 2026-10-24)
+## Design options (added by corpus, 2026-10-24)
 - `rvt_geometry.design_options(file)` -> `{option_id: {'name', 'set_id', 'set_name', 'main': bool}}`: the real design options of the file (DesignOption records with id != 0; the nameless id-0 DesignOption is a placeholder and is not in `file_geometry_index` either). `main` is True for the main option of its option set (DesignOptionSet.m_mainDesignOption).
 - `rvt_geometry.design_option(file, element_id)` -> the id of the design option the element belongs to, or None (element is in the main model). Only ids of real DesignOption records are returned (the raw field `m_designOptionId` carries several sentinels, e.g. 0xFFFFFFFF, 0xFFFFFFFC, 2^64-1).
 - `element_geometry` notes: SWall returns the saved-graphics mesh (`mesh_approx`, flags include `closed_shell`) whenever one exists, else the parametric `approx` wall; BaseRailing/Railing/StairsRun/DirectShape with a stored bbox but no saved graphics return `box` (flags `symbol_no_graphics`, `bbox_only`) instead of `none`. For volumes use `rvt_elemmesh.element_mesh` (per-body ids `nid`); the flat triangle list of `element_geometry` has no body ids.

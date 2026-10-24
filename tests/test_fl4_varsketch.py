@@ -1,4 +1,4 @@
-"""Regression (bm3fam 2026-10-23): Revit 2014-2017 VarSketch VarParam.m_pSubst (kind 0e, flags 4) is a nullable pointer slot.
+"""Regression (corpus 2026-10-23): Revit 2014-2017 VarSketch VarParam.m_pSubst (kind 0e, flags 4) is a nullable pointer slot.
 Run: RVT_NOFAST=1 python3 tests/test_fl4_varsketch.py  (Autodesk sample families 2016/2017 must decode with 0 real record errors)"""
 import sys, os, glob
 os.environ.setdefault('RVT_NOFAST', '1')

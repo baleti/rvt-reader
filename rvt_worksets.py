@@ -48,7 +48,7 @@ def element_worksets(path):
     out = {}
     rec = 40 if all(struct.unpack_from('<I', et, 6 + k * 40)[0] == struct.unpack_from('<I', et, 6 + k * 40 + 20)[0] for k in range(min(8, (len(et) - 6) // 40))) else 28      # 40-byte records repeat the id at +20
     n = (len(et) - 6) // rec
-    nh = struct.unpack_from('<I', et, 2)[0]                                # header row count: real office files carry a second table after the element rows (up to 1.9x more bytes); reading past nh returned junk ids/workset words (bm3reader 2026-10-23: count = decoded elements in 93/93 files)
+    nh = struct.unpack_from('<I', et, 2)[0]                                # header row count: real office files carry a second table after the element rows (up to 1.9x more bytes); reading past nh returned junk ids/workset words (corpus 2026-10-23: count = decoded elements in 93/93 files)
     if 0 < nh <= n: n = nh
     for k in range(n):
         b = 6 + k * rec

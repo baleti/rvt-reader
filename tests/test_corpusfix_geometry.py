@@ -1,4 +1,4 @@
-# regression for the BM3-driven reader fixes (synthetic records only, no client data):
+# regression for the corpus-driven reader fixes (synthetic records only, no client data):
 # BaseRailing bbox-only box, SWall prefers closed-shell mesh, DesignOption id-0 phantom dropped (ProjectPhase id 0 kept), design_option API
 import sys,os; sys.path.insert(0,os.path.expanduser(os.environ.get('RVT_CODE','~/rvt-research')))
 import rvt_geometry as G, rvt_elemmesh as EM
