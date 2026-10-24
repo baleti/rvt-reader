@@ -24,7 +24,7 @@ the last 353 bytes are a checksum/ECC trailer that must be REMOVED before inflat
 the OLE stream (including any 8-byte custom prefix). Streams < 64,896 bytes are unaffected, which is why small streams always worked.
 Then: [optional 8-byte prefix] + 10-byte gzip header + raw deflate (-15) + 8-byte (CRC32, ISIZE) trailer. After stripping, 97/97 Formats+Global
 streams in 14 files (Revit 2011-2025) match CRC and size exactly. Partitions/NN: 44-byte header + ~1270 gzip members, 0 false hits after stripping
-(was 103 false hits and ~10.8 MB lost). Credit: page layout constants taken from DrunkOnJava/rvt-rs (Apache-2.0), confirmed independently here
+(was 103 false hits and ~10.8 MB lost). Page layout numbers are also published by DrunkOnJava/rvt-rs (Apache-2.0, prior art), confirmed independently here
 (the 0x00 byte at stream offset 64,896 in 3 streams, break position 64,89x in 3 streams, CRC/size match after stripping).
 Superseded earlier wrong conclusions: "CRC mismatch = corruption" (true cause: paging), "~50% class-name overlap between versions" (tokenizer noise),
 "PartitionTable lists views" (it is the worksharing partition list; see below).
