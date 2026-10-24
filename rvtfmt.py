@@ -1,4 +1,4 @@
-"""Core stream handling for Revit (.rvt/.rfa/.rte) files. Clean implementation; page layout constants learned from
+"""Core stream handling for Revit (.rvt/.rfa/.rte) files. Clean implementation; page layout constants learned by experiment,
 also published by DrunkOnJava/rvt-rs (Apache-2.0; prior art, no code used) and confirmed here by experiment on 14 files (Revit 2011-2025)."""
 import zlib, re
 PAGE_STORED = 65249     # bytes per stored page
