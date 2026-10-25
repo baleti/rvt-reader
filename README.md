@@ -16,7 +16,7 @@ Everything is plain Python plus `olefile` (and optionally [rvt-core](https://git
 
 ## Gallery
 
-Everything below was decoded straight from the `.rvt` files by this reader (geometry, materials, levels and grids), then drawn with [rvt-viewer](https://github.com/baleti/rvt-viewer). No Revit was involved. The models are the standard Autodesk sample files, which are not redistributed here.
+Everything below was decoded straight from the `.rvt` files by this reader (geometry, materials, levels and grids), then drawn with [rvt-viewer](https://github.com/baleti/rvt-viewer). No Revit was involved. The models are the standard Autodesk sample files, which are not redistributed here. Sample models shown in the screenshots are (c) Autodesk, Inc., reproduced only as renderings by this reader for demonstration of its output.
 
 <table>
 <tr>
