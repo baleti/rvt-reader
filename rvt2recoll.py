@@ -36,6 +36,8 @@ try:
             if int(host1("systemctl --user show qemu-ai1 -p NRestarts").split('=')[1]) > BASE:
                 open(HALT, 'w').write('qemu-ai1 restarted\n')
         except Exception: pass
+    elif os.path.exists('/home/user1/rvt-env/bin/python') and os.path.exists(os.path.join(here, 'rvt_cache_get.py')):      # on host1: decode locally, cached
+        txt = subprocess.run(['/home/user1/rvt-env/bin/python', os.path.join(here, 'rvt_cache_get.py'), f], capture_output=True, timeout=1150).stdout.decode('utf-8', 'replace')
     else:
         txt = subprocess.run([sys.executable, '-I', os.path.join(here, 'rvt2text.py'), f], capture_output=True, timeout=1100).stdout.decode('utf-8', 'replace')
 except Exception:
