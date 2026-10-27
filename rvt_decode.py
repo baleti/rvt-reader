@@ -23,7 +23,7 @@ class EID(int):
 import json as _json
 def load_hints(path=None):
     path = path or os.path.join(os.path.dirname(os.path.abspath(__file__)), 'rvt_hints.json')
-    try: return _json.load(open(path))
+    try: return _json.load(open(path, encoding='utf-8'))
     except Exception: return {}
 
 

@@ -9,7 +9,7 @@ sys.path.append(os.path.expanduser('~/src/rvt-core/python'))
 import rvt_fast as F
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-CATS = json.load(open(os.path.join(HERE, 'category_names.json')))
+CATS = json.load(open(os.path.join(HERE, 'category_names.json'), encoding='utf-8'))
 NOISE = {'GStyleElem', 'CurveElem', 'CategoryElem', 'FontElem', 'ParamBinding', 'SketchPlane', 'Hub', 'ReferencePoint', 'FamSymSurrogate', 'FamilySurrogate',
          'VarSketch', 'TextNoteAttributes', 'LinearDimString', 'Viewer', 'FamilyBase', 'MasterImportSymbol', 'ImportInstance', 'SlaveImportSymbol', 'LegendComponent',
          'SegmentCenterLine', 'PipeFittingCenterLine', 'DuctFittingCenterLine', 'CableTrayFittingCenterLine'}

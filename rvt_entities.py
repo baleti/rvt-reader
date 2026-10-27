@@ -46,6 +46,7 @@ def extract(path, extra=(), only_ids=None, want_all=False, slim=None):
         except Exception: pass
         return n
     NW = int(os.environ.get('RVT_WORKERS', _auto_workers()))
+    if 'fork' not in mp.get_all_start_methods(): NW = 1       # Windows: no fork, workers cannot share the decoded file -> sequential
     def work(lo, hi):
         """decode candidates cand[lo:hi] of the current chunk (inherited through fork); returns ([( (eid,cls), rec )], [(eid, fields)])"""
         lrecs = {}; leh = {}
@@ -99,7 +100,7 @@ def parse(path):
         by[c].append(r); recs.setdefault(eid, r)
     nm = lambda i: (recs[i]['fields'].get('m_text') or recs[i]['fields'].get('m_viewName') or recs[i]['fields'].get('m_name') or '') if i in recs else ''
     import json as _j
-    cat = _j.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'category_names.json')))
+    cat = _j.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'category_names.json'), encoding='utf-8'))
     def sc(v): v = int(v); return v - (1 << (8 * W)) if v >= 1 << (8 * W - 1) else v
     ccount = collections.Counter(cat.get(str(sc(h['m_categroryId'])), 'cat %d' % sc(h['m_categroryId'])) for h in x['eh'].values())
     out = {'counts': dict(ccount.most_common())}
